@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import shutil
 import subprocess  # nosec B404 - appels à des binaires fixes, sans shell
 import sys
@@ -20,7 +21,8 @@ PNG = ROOT / "docs/security/dfd.png"
 DOT_HASH = ROOT / "docs/security/dfd.dot.sha256"
 
 
-def dot_source() -> str:
+def raw_dot_source() -> str:
+    """Sortie DOT de pytm, prête pour Graphviz (chemins d'icônes absolus)."""
     out = subprocess.run(  # noqa: S603  # nosec B603 - arguments fixes, pas de shell
         [sys.executable, str(MODEL), "--dfd"],
         check=True,
@@ -31,13 +33,19 @@ def dot_source() -> str:
     return out.replace("\\\\n", " ").replace("\\n", " ")
 
 
+def dot_source() -> str:
+    """Sortie DOT normalisée pour l'empreinte : pytm y écrit le chemin absolu de ses icônes,
+    qui change d'une machine à l'autre (venv, version de Python). On le retire pour que
+    l'empreinte ne dépende que du modèle de menaces."""
+    return re.sub(r'image = "[^"]*/pytm/images/', 'image = "pytm/images/', raw_dot_source())
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="vérifie que le PNG est à jour")
     args = parser.parse_args()
 
-    src = dot_source()
-    digest = hashlib.sha256(src.encode()).hexdigest()
+    digest = hashlib.sha256(dot_source().encode()).hexdigest()
 
     if args.check:
         if not DOT_HASH.exists() or DOT_HASH.read_text().strip() != digest:
@@ -51,7 +59,7 @@ def main() -> int:
         print("Graphviz (dot) est requis : apt install graphviz / brew install graphviz")
         return 2
     subprocess.run(  # noqa: S603  # nosec B603 - binaire résolu, arguments fixes
-        [dot, "-Tpng", "-Gdpi=110", "-o", str(PNG)], input=src, text=True, check=True
+        [dot, "-Tpng", "-Gdpi=110", "-o", str(PNG)], input=raw_dot_source(), text=True, check=True
     )
     DOT_HASH.write_text(digest + "\n")
     print(f"Écrit : {PNG.relative_to(ROOT)}")
