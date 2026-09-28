@@ -1,0 +1,76 @@
+# Portes locales : elles tournent à chaque `git commit`, avant que le code quitte le poste.
+# Installation : `pre-commit install` (une fois). Tout lancer : `pre-commit run --all-files`.
+# Mise à jour des versions : `pre-commit autoupdate` (Dependabot ne gère pas ce fichier).
+minimum_pre_commit_version: "3.7.0"
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+
+repos:
+  # Hygiène générale des fichiers
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=600"]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-private-key
+      - id: no-commit-to-branch          # on ne commite jamais directement sur main
+        args: ["--branch", "main"]
+
+  # Porte 1 : secrets
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Porte 2 : qualité et sécurité du code Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml", "-q"]
+        additional_dependencies: ["bandit[toml]"]
+
+  # Scripts shell d'infrastructure
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Règles maison
+  - repo: local
+    hooks:
+      - id: no-env-files
+        name: interdire les fichiers .env (utiliser .env.example)
+        language: fail
+        entry: "Fichier .env interdit dans le dépôt : mettez les secrets dans Secret Manager ou GitHub Secrets."
+        files: '(^|/)\.env(\.[^/]*)?$'
+        exclude: '(^|/)\.env\.example$'
+
+      - id: asvs-mapping-complete
+        name: liste ASVS niveau 1 complète et à jour
+        language: system
+        entry: python3 scripts/asvs_checklist.py --check
+        pass_filenames: false
+        files: '^(docs/security/asvs|scripts/asvs_checklist\.py)'
+
+      - id: dfd-a-jour
+        name: schéma de flux régénéré après un changement du modèle de menaces
+        language: system
+        entry: python3 scripts/render_dfd.py --check
+        pass_filenames: false
+        files: '^(docs/security/threat_model\.py|docs/security/dfd)'

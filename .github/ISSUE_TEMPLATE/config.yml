@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Signaler une faille de sécurité (en privé)
+    url: https://github.com/GITHUB_USER/snacki/security/advisories/new
+    about: Ne publiez jamais une faille dans une issue publique. Utilisez ce formulaire privé.

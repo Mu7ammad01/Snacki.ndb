@@ -1,0 +1,39 @@
+# Secrets : jamais dans le dépôt
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*service-account*.json
+gha-creds-*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Rapports générés localement
+reports/
+*.sarif
+
+# Systèmes
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

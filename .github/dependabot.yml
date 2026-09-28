@@ -1,0 +1,24 @@
+# Porte 6 (en continu) : Dependabot propose une PR dès qu'une dépendance a une mise à jour.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      outils-dev:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"

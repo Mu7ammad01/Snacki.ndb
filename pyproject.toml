@@ -1,0 +1,31 @@
+# Outillage du dépôt (scripts de sécurité, tests). L'API aura son propre pyproject dans apps/api (J2).
+[project]
+name = "snacki-tools"
+version = "0.1.0"
+description = "Outils DevSecOps du dépôt Snacki"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=9.1", "ruff>=0.16", "bandit[toml]>=1.9", "pre-commit>=4.6", "pytm>=1.4"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["docs/security/asvs"]
+
+[tool.ruff.lint]
+# E/F : erreurs de base · I : imports triés · B : pièges courants · UP : syntaxe moderne
+# S : règles de sécurité (flake8-bandit) · SIM : simplifications
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]            # les assert sont normaux dans les tests
+"docs/security/threat_model.py" = ["F405", "F403"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "node_modules"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
