@@ -1,8 +1,8 @@
 # Tout changement passe par le propriétaire. Les fichiers sensibles sont listés à part
 # pour rester visibles quand une deuxième personne rejoindra le projet.
-*                          @GITHUB_USER
-/.github/                  @GITHUB_USER
-/infra/                    @GITHUB_USER
-/docs/security/            @GITHUB_USER
-/.pre-commit-config.yaml   @GITHUB_USER
-/SECURITY.md               @GITHUB_USER
+*                          @Mu7ammad01
+/.github/                  @Mu7ammad01
+/infra/                    @Mu7ammad01
+/docs/security/            @Mu7ammad01
+/.pre-commit-config.yaml   @Mu7ammad01
+/SECURITY.md               @Mu7ammad01
