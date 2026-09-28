@@ -2,7 +2,7 @@
 
 Version 1 · J1 (27 septembre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
-Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 24 menaces ci-dessous en découlent : 4 sont traitées dès J1 (dont 2 par des scripts à appliquer sur GitHub et Google Cloud), 1 est en cours, les 19 autres ont leur jour de traitement dans le plan.
+Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 24 menaces ci-dessous en découlent : 4 sont traitées dès J1 (dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud), 1 est en cours, les 19 autres ont leur jour de traitement dans le plan.
 
 ## 1. Périmètre et hypothèses
 
@@ -116,11 +116,11 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T16 | api | I | La synthèse IA invente un chiffre d'affaires | 2 × 2 | moyen | Chiffres fournis par SQL, vérification automatique de chaque nombre | LLM09 | J10 | prévu |
 | T17 | Dépôt | I | Une clé (base, Gemini) commitée par erreur | 2 × 3 | élevé | gitleaks en pre-commit et en CI, protection des pushs GitHub, `.env` interdits | V13 (N2) | J1 | **fait** |
 | T18 | Flux 12 | T | Action GitHub tierce détournée (étiquette déplacée) | 1 × 3 | moyen | Actions épinglées par empreinte SHA, `permissions: contents: read`, `persist-credentials: false` | V15.2.1 | J1 | **fait** |
-| T19 | Flux 12 | T | Code poussé sur `main` sans revue ni tests | 2 × 3 | élevé | Branche protégée : PR obligatoire, portes vertes, pas de force-push | V15 | J1 | **fait** (script prêt, à appliquer) |
+| T19 | Flux 12 | T | Code poussé sur `main` sans revue ni tests | 2 × 3 | élevé | Branche protégée : PR obligatoire, portes vertes, pas de force-push | V15 | J1 | **fait** (appliqué le 28/09/2026 : 12/12 contrôles) |
 | T20 | Dépendances | T | Paquet PyPI ou npm vulnérable ou malveillant | 2 × 3 | élevé | Versions figées, Dependabot dès J1, pip-audit / npm audit / Trivy bloquants à J5 | V15.2.1 | J1 → J5 | en cours |
 | T21 | Flux 13 | S | Clé de compte de service Google volée dans la CI | 1 × 3 | moyen | Aucune clé : Workload Identity Federation limitée au dépôt et à la branche `main` | V13 (N2) | J5 | prévu |
 | T22 | Secret Manager | E | L'API de staging lit les secrets de production | 1 × 3 | moyen | Un compte de service par environnement, droits au secret près | V13 (N2) | J5 | prévu |
-| T23 | Cloud | D | Abus qui fait exploser la facture | 2 × 2 | moyen | Alerte de budget à 1 €, `max-instances=2`, quotas IA | V6.1.1 | J1 | **fait** (script prêt, à appliquer) |
+| T23 | Cloud | D | Abus qui fait exploser la facture | 2 × 2 | moyen | Alerte de budget à 1 €, `max-instances=2`, quotas IA | V6.1.1 | J1 | **fait** (appliqué le 28/09/2026 : budget de 1 EUR actif) |
 | T24 | Base | I | Vol ou perte des données (compte Neon compromis, suppression) | 1 × 3 | moyen | 2FA sur Neon et Google, historique de 6 h, export hebdomadaire chiffré | V11.3.2 | J14 | prévu |
 
 ## 8. Cas d'abus (tests à écrire)
@@ -156,3 +156,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | Date | Version | Changement |
 | --- | --- | --- |
 | 27/09/2026 | 1 | Création (J1) : 7 biens, 24 menaces, matrice des droits, limites de débit |
+| 28/09/2026 | 1.1 | T19 et T23 appliqués (réglages GitHub 12/12, projet Google Cloud et budget) |
