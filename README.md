@@ -4,7 +4,7 @@ PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à No
 
 Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
 
-> État : **J1 / 15** · socle du dépôt, portes de sécurité et modèle de menaces. L'application arrive à partir de J2.
+> État : **J2 / 15** · API Python en place (FastAPI, PostgreSQL, migrations, menu des 9 produits). La commande arrive à J3.
 
 ## Architecture
 
@@ -35,7 +35,8 @@ flowchart LR
 | 1 · Secrets | gitleaks (poste + CI), protection des pushs GitHub | J1 |
 | 2 · Qualité et sécurité du code | ruff (règles `S`), Bandit | J1 |
 | Chaîne d'approvisionnement | actions épinglées par SHA, Dependabot | J1 |
-| 3–4 · Tests et autorisations | pytest | J3 |
+| 3 · Tests de l'API | pytest sur PostgreSQL, couverture ≥ 80 %, migrations réversibles | J2 |
+| 4 · Tests d'autorisation | pytest | J3 |
 | 5–7 · SAST, dépendances, image | CodeQL, Semgrep, pip-audit, Trivy | J5 |
 | 8 · IA | jeu d'évaluation de l'assistant | J9 |
 | 9 · Application en ligne | OWASP ZAP | J12 |
@@ -62,7 +63,7 @@ Travailler toujours sur une branche (`git switch -c j2-socle-api`) : `main` n'ac
 ## Organisation du dépôt
 
 ```
-apps/api/        API FastAPI (à partir de J2)
+apps/api/        API FastAPI (voir apps/api/README.md)
 apps/web/        PWA Next.js (à partir de J4)
 docs/security/   modèle de menaces (as code + texte), ASVS, schéma de flux
 docs/adr/        décisions d'architecture

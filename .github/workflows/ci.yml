@@ -1,5 +1,5 @@
-# CI de J1 : portes 1 (secrets), 2 (qualité) et tests des outils de sécurité.
-# Les portes 3 à 9 s'ajoutent au fil du plan (J3, J5, J9, J12).
+# CI : portes 1 (secrets), 2 (qualité), tests des outils (J1) et de l'API sur PostgreSQL (J2).
+# Les portes suivantes s'ajoutent au fil du plan (J3, J5, J9, J12).
 name: ci
 
 on:
@@ -68,3 +68,41 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Tests des outils de sécurité
         run: python -m pytest
+
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Même moteur qu'en production (Neon) : les tests tournent sur un vrai PostgreSQL, jetable.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: snacki
+          POSTGRES_PASSWORD: ci-only-not-a-secret  # base éphémère, détruite à la fin du job
+          POSTGRES_DB: snacki_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U snacki" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      SNACKI_TEST_DATABASE_URL: postgresql://snacki:ci-only-not-a-secret@localhost:5432/snacki_test
+      SNACKI_DATABASE_URL: postgresql://snacki:ci-only-not-a-secret@localhost:5432/snacki_test
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Installer l'API
+        run: python -m pip install -r requirements-dev.txt
+      - name: Migrations appliquées puis annulées (réversibles)
+        run: |
+          alembic upgrade head
+          alembic check
+          alembic downgrade base
+      - name: Tests de l'API (couverture minimale 80 %)
+        run: python -m pytest --cov --cov-report=term-missing
