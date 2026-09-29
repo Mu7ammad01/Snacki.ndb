@@ -1,4 +1,4 @@
-# Outillage du dépôt (scripts de sécurité, tests). L'API aura son propre pyproject dans apps/api (J2).
+# Outillage du dépôt (scripts de sécurité, tests). L'API a son propre pyproject dans apps/api.
 [project]
 name = "snacki-tools"
 version = "0.1.0"
@@ -20,11 +20,15 @@ extend-exclude = ["docs/security/asvs"]
 select = ["E", "F", "I", "B", "UP", "S", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]            # les assert sont normaux dans les tests
+"**/tests/**" = ["S101"]         # les assert sont normaux dans les tests
 "docs/security/threat_model.py" = ["F405", "F403"]
+"apps/api/migrations/versions/**" = ["E501"]   # données du menu, une ligne par produit
+
+[tool.ruff.lint.isort]
+known-first-party = ["snacki_api"]
 
 [tool.bandit]
-exclude_dirs = ["tests", ".venv", "node_modules"]
+exclude_dirs = ["tests", "apps/api/tests", ".venv", "node_modules"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -66,7 +66,7 @@ gh api -X PUT "repos/${REPO}/branches/${BRANCH}/protection" --input - >/dev/null
 {
   "required_status_checks": {
     "strict": true,
-    "checks": [{"context": "secrets"}, {"context": "quality"}, {"context": "tests"}]
+    "checks": [{"context": "secrets"}, {"context": "quality"}, {"context": "tests"}, {"context": "api"}]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {

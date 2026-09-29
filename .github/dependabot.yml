@@ -22,3 +22,14 @@ updates:
         patterns: ["*"]
     commit-message:
       prefix: "deps"
+
+  - package-ecosystem: pip
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      api:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps(api)"

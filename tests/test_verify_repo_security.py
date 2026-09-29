@@ -36,7 +36,12 @@ GOOD = {
             "required_pull_request_reviews": {"required_approving_review_count": 0},
             "required_status_checks": {
                 "strict": True,
-                "checks": [{"context": "secrets"}, {"context": "quality"}, {"context": "tests"}],
+                "checks": [
+                    {"context": "secrets"},
+                    {"context": "quality"},
+                    {"context": "tests"},
+                    {"context": "api"},
+                ],
             },
             "enforce_admins": {"enabled": True},
             "allow_force_pushes": {"enabled": False},
@@ -124,7 +129,10 @@ def test_porte_ci_manquante_et_force_push():
 def test_ancien_format_contexts_accepte():
     responses = copy.deepcopy(GOOD)
     prot = responses[f"/repos/{REPO}/branches/main/protection"][1]
-    prot["required_status_checks"] = {"strict": True, "contexts": ["secrets", "quality", "tests"]}
+    prot["required_status_checks"] = {
+        "strict": True,
+        "contexts": ["secrets", "quality", "tests", "api"],
+    }
     assert by_id(v.run_checks(fake(responses), REPO))["R9"].ok
 
 

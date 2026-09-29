@@ -24,7 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 API = "https://api.github.com"
-REQUIRED_CHECKS = ("secrets", "quality", "tests")
+REQUIRED_CHECKS = ("secrets", "quality", "tests", "api")
 
 # fetch(chemin) -> (code HTTP, corps JSON ou None)
 Fetch = Callable[[str], tuple[int, dict | None]]
@@ -150,7 +150,7 @@ def run_checks(fetch: Fetch, repo: str, branch: str = "main") -> list[Result]:
             "R9",
             "Portes CI obligatoires avant fusion",
             not missing and bool(checks.get("strict")),
-            "manquantes : " + ", ".join(missing) if missing else "secrets, quality, tests",
+            "manquantes : " + ", ".join(missing) if missing else ", ".join(REQUIRED_CHECKS),
         )
     )
     results.append(

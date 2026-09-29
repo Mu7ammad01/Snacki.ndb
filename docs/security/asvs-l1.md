@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 5 fait · 42 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 7 fait · 40 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -14,7 +14,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | V1.2.1 | Verify that output encoding for an HTTP response, HTML document, or XML document is relevant for the context required, such as encoding the relevant … | prévu | J4 | React échappe le texte par défaut ; aucun dangerouslySetInnerHTML ; règle ESLint qui l'interdit. |
 | V1.2.2 | Verify that when dynamically building URLs, untrusted data is encoded according to its context (e.g., URL encoding or base64url encoding for query or path … | prévu | J4 | Liens wa.me construits avec encodeURIComponent ; paramètres d'URL côté API encodés par httpx. |
 | V1.2.3 | Verify that output encoding or escaping is used when dynamically building JavaScript content (including JSON), to avoid changing the message or document … | prévu | J3 | JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes. |
-| V1.2.4 | Verify that data selection or database queries (e.g., SQL, HQL, NoSQL, Cypher) use parameterized queries, ORMs, entity frameworks, or are otherwise protected … | prévu | J2 | SQLAlchemy avec paramètres liés ; règle Semgrep et Bandit B608 contre le SQL construit par chaîne. |
+| V1.2.4 | Verify that data selection or database queries (e.g., SQL, HQL, NoSQL, Cypher) use parameterized queries, ORMs, entity frameworks, or are otherwise protected … | fait | J2 | SQLAlchemy 2 (select, paramètres liés) pour toute requête ; entrées en liste blanche (Enum, motif d'identifiant) ; ruff S608 et Bandit B608 bloquants. Semgrep s'ajoute à J5. Preuve : `apps/api/src/snacki_api/repository.py, apps/api/tests/test_security.py (7 tests d’injection)`. |
 | V1.2.5 | Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line … | fait | J1 | Aucun appel shell dans l'application ; ruff S602/S605 et Bandit B602/B605 bloquants en pre-commit et en CI. Preuve : `.pre-commit-config.yaml, pyproject.toml [tool.ruff.lint]`. |
 | V1.3.1 | Verify that all untrusted HTML input from WYSIWYG editors or similar is sanitized using a well-known and secure HTML sanitization library or framework feature. | N/A |  | Aucun éditeur de texte riche ni saisie HTML dans Snacki. |
 | V1.3.2 | Verify that the application avoids the use of eval() or other dynamic code execution features such as Spring Expression Language (SpEL). Where there is no … | fait | J1 | eval/exec interdits : ruff S307 et Bandit B307 bloquants ; ESLint no-eval côté front (J4). Preuve : `pyproject.toml [tool.ruff.lint] select S`. |
@@ -150,4 +150,4 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | --- | --- | --- | --- | --- |
 | V15.1.1 | Verify that application documentation defines risk based remediation time frames for 3rd party component versions with vulnerabilities and for updating … | fait | J1 | Délais de correction documentés : critique 7 jours, haute 30 jours, moyenne 90 jours. Preuve : `SECURITY.md`. |
 | V15.2.1 | Verify that the application only contains components which have not breached the documented update and remediation time frames. | prévu | J5 | Portes 6 et 7 (pip-audit, npm audit, Trivy) bloquent toute dépendance hors délai ; Dependabot actif dès J1. |
-| V15.3.1 | Verify that the application only returns the required subset of fields from a data object. For example, it should not return an entire data object, as some … | prévu | J3 | Schémas de réponse Pydantic dédiés (response_model) : jamais d'objet de base de données renvoyé tel quel. |
+| V15.3.1 | Verify that the application only returns the required subset of fields from a data object. For example, it should not return an entire data object, as some … | fait | J2 | Schémas de réponse Pydantic dédiés (response_model) : jamais d'objet de base de données renvoyé tel quel ; test qui fige la liste des champs publics. Preuve : `apps/api/src/snacki_api/schemas.py, apps/api/tests/test_menu.py::test_reponse_limitee_aux_champs_publics`. |
