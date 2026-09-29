@@ -20,10 +20,15 @@ class Settings(BaseSettings):
         env_file=".env",  # confort local ; fichier ignoré par git et bloqué par pre-commit
         env_file_encoding="utf-8",
         extra="ignore",
+        # Une valeur refusée n'est jamais recopiée dans le message d'erreur : c'est souvent
+        # un secret mal collé (mot de passe seul, URL incomplète) qui finirait dans le terminal
+        # ou dans les journaux.
+        hide_input_in_errors=True,
     )
 
     environment: Environment = "dev"
-    # SecretStr : la valeur n'apparaît ni dans repr(), ni dans les journaux, ni dans les erreurs.
+    # SecretStr : la valeur n'apparaît ni dans repr() ni dans les journaux ; hide_input_in_errors
+    # couvre les messages d'erreur de validation.
     database_url: SecretStr
     cors_origins: list[str] = Field(default_factory=list)
     db_pool_size: int = Field(default=5, ge=1, le=20)
