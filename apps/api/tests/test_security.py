@@ -55,6 +55,15 @@ def test_secret_absent_des_affichages(settings):
     assert password not in str(settings.model_dump())
 
 
+def test_secret_absent_des_erreurs_de_validation():
+    # Incident J2 : un mot de passe collé seul apparaissait en clair dans l'erreur pydantic.
+    faux_secret = "npg_CeciEstUnFauxSecret"  # noqa: S105 - valeur de test
+    with pytest.raises(ValidationError) as err:
+        Settings(_env_file=None, database_url=faux_secret)
+    assert faux_secret not in str(err.value)
+    assert "URL PostgreSQL" in str(err.value)
+
+
 def test_production_exige_tls_vers_la_base():
     with pytest.raises(ValidationError, match="sslmode"):
         Settings(_env_file=None, environment="prod", database_url="postgresql://u:p@h/db")
