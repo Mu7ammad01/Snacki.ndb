@@ -7,18 +7,26 @@ Lancement local, depuis apps/api avec SNACKI_DATABASE_URL :
 import logging
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from snacki_api import repository
+from snacki_api import orders, repository
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
 from snacki_api.models import Category
-from snacki_api.schemas import Health, MenuOut, ProductOut
+from snacki_api.ratelimit import DEFAULT_RULES, RateLimiter
+from snacki_api.schemas import (
+    Health,
+    MenuOut,
+    OrderCreatedOut,
+    OrderIn,
+    OrderTrackOut,
+    ProductOut,
+)
 
 log = logging.getLogger("snacki.api")
 
@@ -37,6 +45,10 @@ SECURITY_HEADERS = {
 }
 
 
+TRACKING_HEADER = "X-Tracking-Token"
+NOT_FOUND = "Commande introuvable ou lien expiré"
+
+
 class Utf8JSONResponse(JSONResponse):
     """Type de contenu avec le jeu de caractères explicite (ASVS V4.1.1)."""
 
@@ -47,7 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
         title="Snacki API",
-        version="0.2.0",
+        version="0.3.0",
         default_response_class=Utf8JSONResponse,
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url=None,
@@ -60,15 +72,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             CORSMiddleware,
             allow_origins=settings.cors_origins,
             allow_methods=["GET", "POST", "PATCH"],
-            allow_headers=["Content-Type", "Authorization"],
+            allow_headers=["Content-Type", "Authorization", TRACKING_HEADER],
             allow_credentials=False,
         )
+
+    limiter = RateLimiter(DEFAULT_RULES)
+    app.state.limiter = limiter
+
+    def rate_limit(rule: str, request: Request) -> None:
+        client = request.client.host if request.client else "inconnu"
+        retry_after = limiter.hit(rule, client)
+        if retry_after:
+            raise HTTPException(
+                status_code=429,
+                detail="Trop de requêtes, réessayez dans un instant",
+                headers={"Retry-After": str(retry_after)},
+            )
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         response = await call_next(request)
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)
+        if request.url.path.startswith("/v1/orders"):
+            # Réponses avec jeton ou données de commande : jamais en cache.
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.exception_handler(SQLAlchemyError)
@@ -104,6 +132,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if found is None:
             raise HTTPException(status_code=404, detail="Produit introuvable")
         return ProductOut.model_validate(found)
+
+    @app.post("/v1/orders", response_model=OrderCreatedOut, status_code=201, tags=["commandes"])
+    def create_order(data: OrderIn, request: Request, session: SessionDep) -> OrderCreatedOut:
+        """Crée une commande. Le client envoie des produits et des quantités ; l'API lit les prix
+        en base et calcule le total. Le jeton de suivi n'est renvoyé qu'une seule fois."""
+        rate_limit("order_create", request)
+        try:
+            order, token = orders.create_order(session, data)
+        except orders.ProduitIndisponible as exc:
+            raise HTTPException(status_code=422, detail=f"Produit indisponible : {exc}") from None
+        return OrderCreatedOut.model_validate(
+            {
+                **OrderTrackOut.model_validate(order).model_dump(),
+                "tracking_token": token,
+                "tracking_expires_at": order.tracking_expires_at,
+            }
+        )
+
+    @app.get("/v1/orders/track", response_model=OrderTrackOut, tags=["commandes"])
+    def track_order(
+        request: Request,
+        session: SessionDep,
+        token: Annotated[str, Header(alias=TRACKING_HEADER)],
+    ) -> OrderTrackOut:
+        """Suivi d'une commande. Le jeton voyage dans un en-tête, jamais dans l'URL (T03) :
+        il n'apparaît ni dans les journaux, ni dans l'historique, ni dans l'en-tête Referer."""
+        rate_limit("order_track", request)
+        order = orders.find_by_token(session, token)
+        if order is None:
+            # Même réponse pour « inconnu », « expiré » et « mal formé » : rien à deviner.
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return OrderTrackOut.model_validate(order)
 
     return app
 

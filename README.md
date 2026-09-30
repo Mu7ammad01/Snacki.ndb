@@ -4,7 +4,7 @@ PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à No
 
 Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
 
-> État : **J2 / 15** · API Python en place (FastAPI, PostgreSQL, migrations, menu des 9 produits). La commande arrive à J3.
+> État : **J3 / 15** · API Python : menu des 9 produits, commande côté serveur (total recalculé), suivi par jeton aléatoire, limite de débit. Le front client arrive à J4.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ flowchart LR
 | 2 · Qualité et sécurité du code | ruff (règles `S`), Bandit | J1 |
 | Chaîne d'approvisionnement | actions épinglées par SHA, Dependabot | J1 |
 | 3 · Tests de l'API | pytest sur PostgreSQL, couverture ≥ 80 %, migrations réversibles | J2 |
-| 4 · Tests d'autorisation | pytest | J3 |
+| 4 · Tests d'autorisation | pytest : accès croisé aux commandes (anti-BOLA) | J3 |
 | 5–7 · SAST, dépendances, image | CodeQL, Semgrep, pip-audit, Trivy | J5 |
 | 8 · IA | jeu d'évaluation de l'assistant | J9 |
 | 9 · Application en ligne | OWASP ZAP | J12 |
