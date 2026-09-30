@@ -19,9 +19,10 @@
     "controle": "Liens wa.me construits avec encodeURIComponent ; paramètres d'URL côté API encodés par httpx."
   },
   "V1.2.3": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J3",
-    "controle": "JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes."
+    "controle": "JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes.",
+    "preuve": "apps/api/src/snacki_api/schemas.py, main.py (Utf8JSONResponse)"
   },
   "V1.2.4": {
     "statut": "fait",
@@ -51,19 +52,22 @@
     "controle": "Import de l'historique Excel (XML) : defusedxml installé pour openpyxl, import en script d'administration et non en téléversement web."
   },
   "V2.1.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J3",
-    "controle": "Règles de validation documentées par les schémas Pydantic, exportés dans la documentation OpenAPI."
+    "controle": "Règles de validation documentées par les schémas Pydantic (OrderIn, OrderItemIn), exportés dans la documentation OpenAPI (/docs en dev).",
+    "preuve": "apps/api/src/snacki_api/schemas.py"
   },
   "V2.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J3",
-    "controle": "Validation positive : produits dans la liste du menu, quantités 1 à 20, téléphone mauritanien à 8 chiffres, longueurs maximales."
+    "controle": "Validation positive : produits du menu (identifiant en liste blanche, disponibilité en base), quantités 1 à 20, 1 à 10 lignes sans doublon, téléphone mauritanien à 8 chiffres (2, 3 ou 4), prénom 1 à 40 caractères sans caractère de contrôle, repère obligatoire en livraison.",
+    "preuve": "apps/api/src/snacki_api/schemas.py, apps/api/tests/test_orders.py (tests de lignes, téléphone, prénom, repère)"
   },
   "V2.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J3",
-    "controle": "Toute validation refaite dans l'API ; la validation du front n'est qu'une aide à la saisie."
+    "controle": "Toute validation refaite dans l'API ; la validation du front n'est qu'une aide à la saisie. Champs inconnus refusés (extra=forbid) : un prix ou un total envoyé par le client rend la requête invalide.",
+    "preuve": "apps/api/tests/test_orders.py : test_prix_envoye_par_le_client_refuse, test_total_calcule_par_le_serveur"
   },
   "V2.3.1": {
     "statut": "prévu",
@@ -105,14 +109,15 @@
     "raison": "Snacki ne s'appuie pas sur le preflight CORS pour se protéger (voir V3.5.1)."
   },
   "V3.5.3": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J3",
-    "controle": "Actions sensibles en POST/PATCH uniquement ; GET sans effet de bord, vérifié par test."
+    "controle": "Création en POST uniquement ; le suivi en GET est sans effet de bord, vérifié par test.",
+    "preuve": "apps/api/tests/test_orders.py : test_suivi_sans_effet_de_bord"
   },
   "V4.1.1": {
     "statut": "prévu",
-    "jour": "J3",
-    "controle": "FastAPI fixe Content-Type ; flux SSE en text/event-stream ; test qui vérifie chaque route."
+    "jour": "J7",
+    "controle": "Content-Type JSON avec charset fixé par l'API pour toutes les routes (fait, J2-J3, testé) ; flux SSE en text/event-stream à vérifier à J7."
   },
   "V4.4.1": {
     "statut": "N/A",
@@ -203,7 +208,7 @@
   "V7.2.3": {
     "statut": "prévu",
     "jour": "J6",
-    "controle": "Identifiant de jeton (jti) et jeton de suivi client tirés avec secrets.token_urlsafe (128 bits)."
+    "controle": "Jeton de suivi client tiré avec secrets.token_urlsafe (128 bits) : fait à J3 (apps/api/src/snacki_api/orders.py). Identifiant de jeton (jti) de session staff : J6."
   },
   "V7.2.4": {
     "statut": "prévu",
@@ -232,9 +237,10 @@
     "controle": "Dépendance FastAPI require_role() sur chaque route du staff ; test qui échoue si une route n'en a pas."
   },
   "V8.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J3",
-    "controle": "Commande lisible seulement avec son jeton de suivi (anti-BOLA) ; tests d'accès croisé."
+    "controle": "Commande lisible seulement avec son jeton de suivi (128 bits, stocké haché, 24 h) ; même réponse 404 pour un jeton inconnu, expiré ou mal formé ; tests d'accès croisé.",
+    "preuve": "apps/api/tests/test_orders.py : test_un_jeton_n_ouvre_que_sa_commande, test_jeton_invalide_meme_reponse, test_jeton_expire"
   },
   "V8.3.1": {
     "statut": "prévu",
@@ -318,8 +324,8 @@
   },
   "V14.2.1": {
     "statut": "prévu",
-    "jour": "J3",
-    "controle": "Jeton de suivi placé dans le fragment d'URL (#), envoyé à l'API dans un en-tête ; aucune donnée personnelle dans les URL."
+    "jour": "J4",
+    "controle": "Côté API (J3, fait) : jeton de suivi reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL, aucune donnée personnelle dans les URL (test_jeton_refuse_dans_l_url). Côté front (J4) : jeton placé dans le fragment d'URL (#)."
   },
   "V14.3.1": {
     "statut": "prévu",

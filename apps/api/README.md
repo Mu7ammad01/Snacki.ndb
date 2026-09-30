@@ -1,6 +1,6 @@
 # API Snacki (FastAPI)
 
-État : **J2** · socle de l'API, base PostgreSQL, migrations, menu des 9 produits.
+État : **J3** · menu des 9 produits, commandes côté serveur, suivi par jeton, limite de débit.
 
 | Route | Rôle |
 | --- | --- |
@@ -8,6 +8,8 @@
 | `GET /readyz` | Disponibilité : la base répond |
 | `GET /v1/menu?category=jus\|delices` | Menu disponible, trié, prix en MRU, noms FR et AR |
 | `GET /v1/menu/{id}` | Un produit (identifiant : minuscules et tirets) |
+| `POST /v1/orders` | Crée une commande : le client envoie produits et quantités, l'API calcule le total ; renvoie le numéro et le jeton de suivi (une seule fois). 5 par minute et 20 par heure. |
+| `GET /v1/orders/track` | Suivi, avec le jeton dans l'en-tête `X-Tracking-Token` (jamais dans l'URL) ; aucune donnée personnelle ; 60 par minute. |
 | `GET /docs` | Documentation interactive, **uniquement** en `dev` et `test` |
 
 ## Démarrer en local
@@ -48,10 +50,12 @@ En staging et en production, ces valeurs viendront de Secret Manager (J5), jamai
 src/snacki_api/
   config.py      configuration (pydantic-settings, secrets en SecretStr)
   db.py          connexion SQLAlchemy (pool vérifié, délai maximal de requête 10 s)
-  models.py      tables (J2 : product)
+  models.py      tables (product, orders, order_line)
   schemas.py     formats de réponse (champs publics uniquement)
-  repository.py  requêtes (ORM, paramètres liés)
+  repository.py  requêtes du menu (ORM, paramètres liés)
+  orders.py      création de commande (prix lus en base) et suivi par jeton haché
+  ratelimit.py   limite de débit en mémoire (fenêtre glissante)
   main.py        application, routes, en-têtes de sécurité, erreurs sans fuite
-migrations/      Alembic : 0001 table product, 0002 menu initial
-tests/           24 tests sur PostgreSQL : menu, injections, configuration, en-têtes
+migrations/      Alembic : 0001 table product, 0002 menu initial, 0003 commandes
+tests/           67 tests sur PostgreSQL : menu, commandes, jetons, limites, injections, configuration
 ```

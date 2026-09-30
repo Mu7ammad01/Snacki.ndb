@@ -1,7 +1,7 @@
 # API Snacki (FastAPI). Dépendances figées dans requirements.txt (mises à jour par Dependabot).
 [project]
 name = "snacki-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "API de Snacki : menu, commandes, caisse, IA"
 requires-python = ">=3.11"
 dependencies = [

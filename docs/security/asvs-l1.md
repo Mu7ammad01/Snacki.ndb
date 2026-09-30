@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 7 fait · 40 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 13 fait · 34 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -13,7 +13,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | --- | --- | --- | --- | --- |
 | V1.2.1 | Verify that output encoding for an HTTP response, HTML document, or XML document is relevant for the context required, such as encoding the relevant … | prévu | J4 | React échappe le texte par défaut ; aucun dangerouslySetInnerHTML ; règle ESLint qui l'interdit. |
 | V1.2.2 | Verify that when dynamically building URLs, untrusted data is encoded according to its context (e.g., URL encoding or base64url encoding for query or path … | prévu | J4 | Liens wa.me construits avec encodeURIComponent ; paramètres d'URL côté API encodés par httpx. |
-| V1.2.3 | Verify that output encoding or escaping is used when dynamically building JavaScript content (including JSON), to avoid changing the message or document … | prévu | J3 | JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes. |
+| V1.2.3 | Verify that output encoding or escaping is used when dynamically building JavaScript content (including JSON), to avoid changing the message or document … | fait | J3 | JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes. Preuve : `apps/api/src/snacki_api/schemas.py, main.py (Utf8JSONResponse)`. |
 | V1.2.4 | Verify that data selection or database queries (e.g., SQL, HQL, NoSQL, Cypher) use parameterized queries, ORMs, entity frameworks, or are otherwise protected … | fait | J2 | SQLAlchemy 2 (select, paramètres liés) pour toute requête ; entrées en liste blanche (Enum, motif d'identifiant) ; ruff S608 et Bandit B608 bloquants. Semgrep s'ajoute à J5. Preuve : `apps/api/src/snacki_api/repository.py, apps/api/tests/test_security.py (7 tests d’injection)`. |
 | V1.2.5 | Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line … | fait | J1 | Aucun appel shell dans l'application ; ruff S602/S605 et Bandit B602/B605 bloquants en pre-commit et en CI. Preuve : `.pre-commit-config.yaml, pyproject.toml [tool.ruff.lint]`. |
 | V1.3.1 | Verify that all untrusted HTML input from WYSIWYG editors or similar is sanitized using a well-known and secure HTML sanitization library or framework feature. | N/A |  | Aucun éditeur de texte riche ni saisie HTML dans Snacki. |
@@ -24,9 +24,9 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V2.1.1 | Verify that the application's documentation defines input validation rules for how to check the validity of data items against an expected structure. This … | prévu | J3 | Règles de validation documentées par les schémas Pydantic, exportés dans la documentation OpenAPI. |
-| V2.2.1 | Verify that input is validated to enforce business or functional expectations for that input. This should either use positive validation against an allow list … | prévu | J3 | Validation positive : produits dans la liste du menu, quantités 1 à 20, téléphone mauritanien à 8 chiffres, longueurs maximales. |
-| V2.2.2 | Verify that the application is designed to enforce input validation at a trusted service layer. While client-side validation improves usability and should be … | prévu | J3 | Toute validation refaite dans l'API ; la validation du front n'est qu'une aide à la saisie. |
+| V2.1.1 | Verify that the application's documentation defines input validation rules for how to check the validity of data items against an expected structure. This … | fait | J3 | Règles de validation documentées par les schémas Pydantic (OrderIn, OrderItemIn), exportés dans la documentation OpenAPI (/docs en dev). Preuve : `apps/api/src/snacki_api/schemas.py`. |
+| V2.2.1 | Verify that input is validated to enforce business or functional expectations for that input. This should either use positive validation against an allow list … | fait | J3 | Validation positive : produits du menu (identifiant en liste blanche, disponibilité en base), quantités 1 à 20, 1 à 10 lignes sans doublon, téléphone mauritanien à 8 chiffres (2, 3 ou 4), prénom 1 à 40 caractères sans caractère de contrôle, repère obligatoire en livraison. Preuve : `apps/api/src/snacki_api/schemas.py, apps/api/tests/test_orders.py (tests de lignes, téléphone, prénom, repère)`. |
+| V2.2.2 | Verify that the application is designed to enforce input validation at a trusted service layer. While client-side validation improves usability and should be … | fait | J3 | Toute validation refaite dans l'API ; la validation du front n'est qu'une aide à la saisie. Champs inconnus refusés (extra=forbid) : un prix ou un total envoyé par le client rend la requête invalide. Preuve : `apps/api/tests/test_orders.py : test_prix_envoye_par_le_client_refuse, test_total_calcule_par_le_serveur`. |
 | V2.3.1 | Verify that the application will only process business logic flows for the same user in the expected sequential step order and without skipping steps. | prévu | J7 | Machine à états des commandes (reçue → en préparation → prête → livrée) appliquée par l'API ; transition interdite = 409. |
 
 ## V3 · Web Frontend Security
@@ -40,13 +40,13 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | V3.4.2 | Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header field is a fixed value by the application, or if the Origin HTTP … | prévu | J5 | API non exposée au navigateur (appelée par web) : aucun en-tête CORS ; si besoin, origine fixe. |
 | V3.5.1 | Verify that, if the application does not rely on the CORS preflight mechanism to prevent disallowed cross-origin requests to use sensitive functionality, … | prévu | J6 | Protection CSRF : SameSite=Lax + jeton CSRF (double soumission) sur les requêtes du staff qui modifient. |
 | V3.5.2 | Verify that, if the application relies on the CORS preflight mechanism to prevent disallowed cross-origin use of sensitive functionality, it is not possible … | N/A |  | Snacki ne s'appuie pas sur le preflight CORS pour se protéger (voir V3.5.1). |
-| V3.5.3 | Verify that HTTP requests to sensitive functionality use appropriate HTTP methods such as POST, PUT, PATCH, or DELETE, and not methods defined by the HTTP … | prévu | J3 | Actions sensibles en POST/PATCH uniquement ; GET sans effet de bord, vérifié par test. |
+| V3.5.3 | Verify that HTTP requests to sensitive functionality use appropriate HTTP methods such as POST, PUT, PATCH, or DELETE, and not methods defined by the HTTP … | fait | J3 | Création en POST uniquement ; le suivi en GET est sans effet de bord, vérifié par test. Preuve : `apps/api/tests/test_orders.py : test_suivi_sans_effet_de_bord`. |
 
 ## V4 · API and Web Service
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V4.1.1 | Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response, including the … | prévu | J3 | FastAPI fixe Content-Type ; flux SSE en text/event-stream ; test qui vérifie chaque route. |
+| V4.1.1 | Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response, including the … | prévu | J7 | Content-Type JSON avec charset fixé par l'API pour toutes les routes (fait, J2-J3, testé) ; flux SSE en text/event-stream à vérifier à J7. |
 | V4.4.1 | Verify that WebSocket over TLS (WSS) is used for all WebSocket connections. | N/A |  | Pas de WebSocket : le temps réel utilise Server-Sent Events en HTTPS. |
 
 ## V5 · File Handling
@@ -82,7 +82,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | --- | --- | --- | --- | --- |
 | V7.2.1 | Verify that the application performs all session token verification using a trusted, backend service. | prévu | J6 | Le JWT est vérifié uniquement par l'API, jamais par le front. |
 | V7.2.2 | Verify that the application uses either self-contained or reference tokens that are dynamically generated for session management, i.e. not using static API … | prévu | J6 | Jetons de session générés à chaque connexion, signés avec une clé stockée dans Secret Manager ; aucune clé d'API statique pour le staff. |
-| V7.2.3 | Verify that if reference tokens are used to represent user sessions, they are unique and generated using a cryptographically secure pseudo-random number … | prévu | J6 | Identifiant de jeton (jti) et jeton de suivi client tirés avec secrets.token_urlsafe (128 bits). |
+| V7.2.3 | Verify that if reference tokens are used to represent user sessions, they are unique and generated using a cryptographically secure pseudo-random number … | prévu | J6 | Jeton de suivi client tiré avec secrets.token_urlsafe (128 bits) : fait à J3 (apps/api/src/snacki_api/orders.py). Identifiant de jeton (jti) de session staff : J6. |
 | V7.2.4 | Verify that the application generates a new session token on user authentication, including re-authentication, and terminates the current session token. | prévu | J6 | Nouveau jeton à chaque connexion ; l'ancien cookie est remplacé et son jti révoqué. |
 | V7.4.1 | Verify that when session termination is triggered (such as logout or expiration), the application disallows any further use of the session. For reference … | prévu | J6 | Déconnexion : jti ajouté à une liste de révocation en base, vérifiée à chaque requête ; durée de vie maximale 8 h. |
 | V7.4.2 | Verify that the application terminates all active sessions when a user account is disabled or deleted (such as an employee leaving the company). | prévu | J6 | Le rôle est relu en base à chaque requête : désactiver un membre du staff coupe immédiatement toutes ses sessions. |
@@ -93,7 +93,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | --- | --- | --- | --- | --- |
 | V8.1.1 | Verify that authorization documentation defines rules for restricting function-level and data-specific access based on consumer permissions and resource … | fait | J1 | Matrice des droits par rôle et règles d'accès aux données documentées (section 5 du modèle de menaces). Preuve : `docs/security/threat-model.md#5`. |
 | V8.2.1 | Verify that the application ensures that function-level access is restricted to consumers with explicit permissions. | prévu | J6 | Dépendance FastAPI require_role() sur chaque route du staff ; test qui échoue si une route n'en a pas. |
-| V8.2.2 | Verify that the application ensures that data-specific access is restricted to consumers with explicit permissions to specific data items to mitigate insecure … | prévu | J3 | Commande lisible seulement avec son jeton de suivi (anti-BOLA) ; tests d'accès croisé. |
+| V8.2.2 | Verify that the application ensures that data-specific access is restricted to consumers with explicit permissions to specific data items to mitigate insecure … | fait | J3 | Commande lisible seulement avec son jeton de suivi (128 bits, stocké haché, 24 h) ; même réponse 404 pour un jeton inconnu, expiré ou mal formé ; tests d'accès croisé. Preuve : `apps/api/tests/test_orders.py : test_un_jeton_n_ouvre_que_sa_commande, test_jeton_invalide_meme_reponse, test_jeton_expire`. |
 | V8.3.1 | Verify that the application enforces authorization rules at a trusted service layer and doesn't rely on controls that an untrusted consumer could manipulate, … | prévu | J6 | Tous les contrôles d'accès dans l'API ; le front ne fait que masquer des boutons. |
 
 ## V9 · Self-contained Tokens
@@ -141,7 +141,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V14.2.1 | Verify that sensitive data is only sent to the server in the HTTP message body or header fields, and that the URL and query string do not contain sensitive … | prévu | J3 | Jeton de suivi placé dans le fragment d'URL (#), envoyé à l'API dans un en-tête ; aucune donnée personnelle dans les URL. |
+| V14.2.1 | Verify that sensitive data is only sent to the server in the HTTP message body or header fields, and that the URL and query string do not contain sensitive … | prévu | J4 | Côté API (J3, fait) : jeton de suivi reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL, aucune donnée personnelle dans les URL (test_jeton_refuse_dans_l_url). Côté front (J4) : jeton placé dans le fragment d'URL (#). |
 | V14.3.1 | Verify that authenticated data is cleared from client storage, such as the browser DOM, after the client or session is terminated. The 'Clear-Site-Data' HTTP … | prévu | J6 | Déconnexion : en-tête Clear-Site-Data "cache", "storage" et suppression du cookie. |
 
 ## V15 · Secure Coding and Architecture
