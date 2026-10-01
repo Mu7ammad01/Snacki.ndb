@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     database_url: SecretStr
     cors_origins: list[str] = Field(default_factory=list)
     db_pool_size: int = Field(default=5, ge=1, le=20)
+    # Adresse du client prise dans X-Forwarded-For (posé par le serveur web) pour la limite de
+    # débit. À n'activer que si l'API n'est joignable que par le serveur web (IAM Cloud Run, J5) :
+    # sinon n'importe qui pourrait choisir son adresse et contourner la limite.
+    trust_forwarded_for: bool = False
 
     @field_validator("database_url")
     @classmethod

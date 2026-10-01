@@ -4,7 +4,7 @@ PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à No
 
 Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
 
-> État : **J3 / 15** · API Python : menu des 9 produits, commande côté serveur (total recalculé), suivi par jeton aléatoire, limite de débit. Le front client arrive à J4.
+> État : **J4 / 15** · Front client Next.js branché sur l'API Python : menu FR/AR, commande (total calculé par l'API), confirmation WhatsApp, suivi par lien `/suivi#jeton`, CSP à nonce. Mise en ligne à J5.
 
 ## Architecture
 
@@ -35,7 +35,7 @@ flowchart LR
 | 1 · Secrets | gitleaks (poste + CI), protection des pushs GitHub | J1 |
 | 2 · Qualité et sécurité du code | ruff (règles `S`), Bandit | J1 |
 | Chaîne d'approvisionnement | actions épinglées par SHA, Dependabot | J1 |
-| 3 · Tests de l'API | pytest sur PostgreSQL, couverture ≥ 80 %, migrations réversibles | J2 |
+| 3 · Tests de l'API et du front | pytest sur PostgreSQL (couverture ≥ 80 %, migrations réversibles) ; Vitest, types et build Next.js | J2, J4 |
 | 4 · Tests d'autorisation | pytest : accès croisé aux commandes (anti-BOLA) | J3 |
 | 5–7 · SAST, dépendances, image | CodeQL, Semgrep, pip-audit, Trivy | J5 |
 | 8 · IA | jeu d'évaluation de l'assistant | J9 |
@@ -64,7 +64,7 @@ Travailler toujours sur une branche (`git switch -c j2-socle-api`) : `main` n'ac
 
 ```
 apps/api/        API FastAPI (voir apps/api/README.md)
-apps/web/        PWA Next.js (à partir de J4)
+apps/web/        PWA Next.js (voir apps/web/README.md)
 docs/security/   modèle de menaces (as code + texte), ASVS, schéma de flux
 docs/adr/        décisions d'architecture
 infra/github/    réglages de sécurité du dépôt (branche protégée, alertes)

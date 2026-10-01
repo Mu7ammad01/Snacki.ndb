@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 13 fait · 34 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 17 fait · 30 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -11,8 +11,8 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V1.2.1 | Verify that output encoding for an HTTP response, HTML document, or XML document is relevant for the context required, such as encoding the relevant … | prévu | J4 | React échappe le texte par défaut ; aucun dangerouslySetInnerHTML ; règle ESLint qui l'interdit. |
-| V1.2.2 | Verify that when dynamically building URLs, untrusted data is encoded according to its context (e.g., URL encoding or base64url encoding for query or path … | prévu | J4 | Liens wa.me construits avec encodeURIComponent ; paramètres d'URL côté API encodés par httpx. |
+| V1.2.1 | Verify that output encoding for an HTTP response, HTML document, or XML document is relevant for the context required, such as encoding the relevant … | fait | J4 | React n'insère que du texte (échappement automatique) ; aucun dangerouslySetInnerHTML, innerHTML, document.write ni eval dans le front, vérifié par un test qui parcourt les sources ; CSP à nonce. Preuve : `apps/web/tests/securite.test.ts (T06 · XSS)`. |
+| V1.2.2 | Verify that when dynamically building URLs, untrusted data is encoded according to its context (e.g., URL encoding or base64url encoding for query or path … | fait | J4 | Lien wa.me construit avec encodeURIComponent ; jeton de suivi validé (base64url, 16 à 64 caractères) avant d'entrer dans l'URL du fragment. Preuve : `apps/web/src/lib/whatsapp.ts, apps/web/tests/commande.test.ts`. |
 | V1.2.3 | Verify that output encoding or escaping is used when dynamically building JavaScript content (including JSON), to avoid changing the message or document … | fait | J3 | JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes. Preuve : `apps/api/src/snacki_api/schemas.py, main.py (Utf8JSONResponse)`. |
 | V1.2.4 | Verify that data selection or database queries (e.g., SQL, HQL, NoSQL, Cypher) use parameterized queries, ORMs, entity frameworks, or are otherwise protected … | fait | J2 | SQLAlchemy 2 (select, paramètres liés) pour toute requête ; entrées en liste blanche (Enum, motif d'identifiant) ; ruff S608 et Bandit B608 bloquants. Semgrep s'ajoute à J5. Preuve : `apps/api/src/snacki_api/repository.py, apps/api/tests/test_security.py (7 tests d’injection)`. |
 | V1.2.5 | Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line … | fait | J1 | Aucun appel shell dans l'application ; ruff S602/S605 et Bandit B602/B605 bloquants en pre-commit et en CI. Preuve : `.pre-commit-config.yaml, pyproject.toml [tool.ruff.lint]`. |
@@ -34,7 +34,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V3.2.1 | Verify that security controls are in place to prevent browsers from rendering content or functionality in HTTP responses in an incorrect context (e.g., when … | prévu | J5 | En-têtes X-Content-Type-Options: nosniff et Content-Type exact sur toutes les réponses ; CSP stricte. |
-| V3.2.2 | Verify that content intended to be displayed as text, rather than rendered as HTML, is handled using safe rendering functions (such as createTextNode or … | prévu | J4 | Textes saisis affichés comme texte (React / textContent), jamais comme HTML. |
+| V3.2.2 | Verify that content intended to be displayed as text, rather than rendered as HTML, is handled using safe rendering functions (such as createTextNode or … | fait | J4 | Textes saisis (prénom, repère, remarque) affichés comme texte par React et ramenés sur une seule ligne dans le message WhatsApp (oneLine) ; aucune insertion HTML. Preuve : `apps/web/src/lib/validate.ts, apps/web/tests/commande.test.ts`. |
 | V3.3.1 | Verify that cookies have the 'Secure' attribute set, and if the '\__Host-' prefix is not used for the cookie name, the '__Secure-' prefix must be used for the … | prévu | J6 | Cookie de session __Host-snacki_session avec Secure, HttpOnly, SameSite=Lax, Path=/. |
 | V3.4.1 | Verify that a Strict-Transport-Security header field is included on all responses to enforce an HTTP Strict Transport Security (HSTS) policy. A maximum age of … | prévu | J5 | Strict-Transport-Security: max-age=31536000; includeSubDomains sur web et api. |
 | V3.4.2 | Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header field is a fixed value by the application, or if the Origin HTTP … | prévu | J5 | API non exposée au navigateur (appelée par web) : aucun en-tête CORS ; si besoin, origine fixe. |
@@ -141,7 +141,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V14.2.1 | Verify that sensitive data is only sent to the server in the HTTP message body or header fields, and that the URL and query string do not contain sensitive … | prévu | J4 | Côté API (J3, fait) : jeton de suivi reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL, aucune donnée personnelle dans les URL (test_jeton_refuse_dans_l_url). Côté front (J4) : jeton placé dans le fragment d'URL (#). |
+| V14.2.1 | Verify that sensitive data is only sent to the server in the HTTP message body or header fields, and that the URL and query string do not contain sensitive … | fait | J4 | API : jeton reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL. Front : lien /suivi#jeton, le fragment n'est jamais envoyé au serveur ; la page le lit et l'envoie en en-tête. Aucune donnée personnelle dans les URL. Preuve : `apps/api/tests/test_orders.py::test_jeton_refuse_dans_l_url, apps/web/src/lib/token.ts, apps/web/tests/securite.test.ts`. |
 | V14.3.1 | Verify that authenticated data is cleared from client storage, such as the browser DOM, after the client or session is terminated. The 'Clear-Site-Data' HTTP … | prévu | J6 | Déconnexion : en-tête Clear-Site-Data "cache", "storage" et suppression du cookie. |
 
 ## V15 · Secure Coding and Architecture

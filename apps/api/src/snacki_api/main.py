@@ -59,7 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
         title="Snacki API",
-        version="0.3.0",
+        version="0.4.0",
         default_response_class=Utf8JSONResponse,
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url=None,
@@ -79,8 +79,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     limiter = RateLimiter(DEFAULT_RULES)
     app.state.limiter = limiter
 
+    def client_key(request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if settings.trust_forwarded_for and forwarded:
+            # Le serveur web n'envoie qu'une adresse : celle du client, vue par le dernier proxy.
+            return forwarded.split(",")[0].strip()[:45]
+        return request.client.host if request.client else "inconnu"
+
     def rate_limit(rule: str, request: Request) -> None:
-        client = request.client.host if request.client else "inconnu"
+        client = client_key(request)
         retry_after = limiter.hit(rule, client)
         if retry_after:
             raise HTTPException(
