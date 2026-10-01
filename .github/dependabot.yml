@@ -42,6 +42,13 @@ updates:
     groups:
       web:
         patterns: ["*"]
+    # Versions majeures = décision humaine (ADR), pas une mise à jour automatique.
+    # @types/node suit la version de Node de l'image (22) ; TypeScript 7 attend le support de Next.js.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps(web)"
 
@@ -50,6 +57,9 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps(docker-api)"
 
@@ -58,5 +68,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps(docker-web)"
