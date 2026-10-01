@@ -52,6 +52,8 @@ updates:
     commit-message:
       prefix: "deps(web)"
 
+  # Images de base : changer de Node ou de Python est une décision (ADR), pas une mise à jour.
+  # Les correctifs de l'OS arrivent par apt-get upgrade et par la reconstruction (--pull).
   - package-ecosystem: docker
     directory: /apps/api
     schedule:
@@ -59,7 +61,7 @@ updates:
       day: monday
     ignore:
       - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     commit-message:
       prefix: "deps(docker-api)"
 
@@ -70,6 +72,6 @@ updates:
       day: monday
     ignore:
       - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     commit-message:
       prefix: "deps(docker-web)"
