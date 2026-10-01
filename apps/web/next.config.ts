@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false, // ne pas annoncer la technologie utilisée
   reactStrictMode: true,
   output: "standalone", // image Docker minimale à J5
+  agentRules: false, // pas de fichiers AGENTS.md / CLAUDE.md générés par « next dev »
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
