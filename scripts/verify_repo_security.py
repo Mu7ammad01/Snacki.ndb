@@ -24,7 +24,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 API = "https://api.github.com"
-REQUIRED_CHECKS = ("secrets", "quality", "tests", "api", "web")
+REQUIRED_CHECKS = (
+    "secrets",
+    "quality",
+    "tests",
+    "api",
+    "web",
+    "deps",
+    "image (api)",
+    "image (web)",
+)
 
 # fetch(chemin) -> (code HTTP, corps JSON ou None)
 Fetch = Callable[[str], tuple[int, dict | None]]

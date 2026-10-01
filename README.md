@@ -37,7 +37,9 @@ flowchart LR
 | Chaîne d'approvisionnement | actions épinglées par SHA, Dependabot | J1 |
 | 3 · Tests de l'API et du front | pytest sur PostgreSQL (couverture ≥ 80 %, migrations réversibles) ; Vitest, types et build Next.js | J2, J4 |
 | 4 · Tests d'autorisation | pytest : accès croisé aux commandes (anti-BOLA) | J3 |
-| 5–7 · SAST, dépendances, image | CodeQL, Semgrep, pip-audit, Trivy | J5 |
+| 5 · Analyse du code (SAST) | CodeQL (Python, TypeScript), ruff `S`, Bandit | J5 |
+| 6 · Dépendances (SCA) | pip-audit, npm audit, Dependabot | J5 |
+| 7 · Images Docker | non root, aucun fichier inutile, Trivy | J5 |
 | 8 · IA | jeu d'évaluation de l'assistant | J9 |
 | 9 · Application en ligne | OWASP ZAP | J12 |
 

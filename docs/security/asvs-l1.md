@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 17 fait · 30 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 19 fait · 28 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -135,7 +135,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V13.4.1 | Verify that the application is deployed either without any source control metadata, including the .git or .svn folders, or in a way that these folders are … | prévu | J5 | .dockerignore exclut .git ; image multi-étapes qui ne copie que le code utile ; vérifié par Trivy et un test. |
+| V13.4.1 | Verify that the application is deployed either without any source control metadata, including the .git or .svn folders, or in a way that these folders are … | fait | J5 | Images multi-étapes : .dockerignore en liste blanche côté API ; aucune copie de .git, des tests ni de .env, vérifié en CI à chaque PR ; npm et pip retirés des images finales. Preuve : `apps/api/Dockerfile, apps/web/Dockerfile, .github/workflows/ci.yml (job image)`. |
 
 ## V14 · Data Protection
 
@@ -149,5 +149,5 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V15.1.1 | Verify that application documentation defines risk based remediation time frames for 3rd party component versions with vulnerabilities and for updating … | fait | J1 | Délais de correction documentés : critique 7 jours, haute 30 jours, moyenne 90 jours. Preuve : `SECURITY.md`. |
-| V15.2.1 | Verify that the application only contains components which have not breached the documented update and remediation time frames. | prévu | J5 | Portes 6 et 7 (pip-audit, npm audit, Trivy) bloquent toute dépendance hors délai ; Dependabot actif dès J1. |
+| V15.2.1 | Verify that the application only contains components which have not breached the documented update and remediation time frames. | fait | J5 | Porte 6 : pip-audit (strict) et npm audit (hautes et critiques) bloquants ; porte 7 : Trivy bloque toute faille haute ou critique corrigible dans les images ; Dependabot (pip, npm, docker, actions) chaque lundi. Preuve : `.github/workflows/ci.yml (jobs deps et image), .github/dependabot.yml`. |
 | V15.3.1 | Verify that the application only returns the required subset of fields from a data object. For example, it should not return an entire data object, as some … | fait | J2 | Schémas de réponse Pydantic dédiés (response_model) : jamais d'objet de base de données renvoyé tel quel ; test qui fige la liste des champs publics. Preuve : `apps/api/src/snacki_api/schemas.py, apps/api/tests/test_menu.py::test_reponse_limitee_aux_champs_publics`. |
