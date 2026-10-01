@@ -1,0 +1,11 @@
+# Le dépôt n'entre pas dans l'image : seulement le code et les fichiers nécessaires à la construction.
+node_modules
+.next
+tests
+*.md
+.gitignore
+Dockerfile
+.dockerignore
+next-env.d.ts
+*.tsbuildinfo
+vitest.config.mts

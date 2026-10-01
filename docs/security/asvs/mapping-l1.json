@@ -321,9 +321,10 @@
     "controle": "Certificats publics gérés par Google sur *.run.app."
   },
   "V13.4.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": ".dockerignore exclut .git ; image multi-étapes qui ne copie que le code utile ; vérifié par Trivy et un test."
+    "controle": "Images multi-étapes : .dockerignore en liste blanche côté API ; aucune copie de .git, des tests ni de .env, vérifié en CI à chaque PR ; npm et pip retirés des images finales.",
+    "preuve": "apps/api/Dockerfile, apps/web/Dockerfile, .github/workflows/ci.yml (job image)"
   },
   "V14.2.1": {
     "statut": "fait",
@@ -343,9 +344,10 @@
     "preuve": "SECURITY.md"
   },
   "V15.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "Portes 6 et 7 (pip-audit, npm audit, Trivy) bloquent toute dépendance hors délai ; Dependabot actif dès J1."
+    "controle": "Porte 6 : pip-audit (strict) et npm audit (hautes et critiques) bloquants ; porte 7 : Trivy bloque toute faille haute ou critique corrigible dans les images ; Dependabot (pip, npm, docker, actions) chaque lundi.",
+    "preuve": ".github/workflows/ci.yml (jobs deps et image), .github/dependabot.yml"
   },
   "V15.3.1": {
     "statut": "fait",
