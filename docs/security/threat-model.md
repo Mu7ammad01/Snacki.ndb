@@ -1,8 +1,8 @@
 # Modèle de menaces de Snacki
 
-Version 3 · J3 (30 septembre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
+Version 4 · J4 (1er octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
-Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 24 menaces ci-dessous en découlent : 9 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2 et 4 à J3), 1 est en cours, les 14 autres ont leur jour de traitement dans le plan.
+Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 24 menaces ci-dessous en découlent : 10 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3 et 1 à J4), 1 est en cours, les 13 autres ont leur jour de traitement dans le plan.
 
 ## 1. Périmètre et hypothèses
 
@@ -100,10 +100,10 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Flux 1–2 | T | Le client modifie le prix ou le total dans la requête | 3 × 3 | critique | Le client n'envoie que produits et quantités (champs inconnus refusés) ; l'API relit les prix en base, recalcule et fige le prix dans chaque ligne | V2.2.2 | J3 | **fait** |
 | T02 | Flux 5 | I | Deviner ou énumérer les jetons pour lire les commandes des autres (BOLA) | 2 × 2 | moyen | Jeton aléatoire de 128 bits, stocké haché (SHA-256), valable 24 h ; même réponse pour tout jeton refusé ; tests d'accès croisé | V8.2.2 | J3 | **fait** |
-| T03 | Flux 5 | I | Le jeton fuit par l'URL (historique, journaux, en-tête Referer) | 2 × 2 | moyen | Jeton en en-tête `X-Tracking-Token`, refusé dans l'URL ; `Referrer-Policy: no-referrer`, `Cache-Control: no-store` ; le suivi ne montre aucune donnée personnelle ; fragment `#` côté front à J4 | V14.2.1 | J3 | **fait** (API) |
+| T03 | Flux 5 | I | Le jeton fuit par l'URL (historique, journaux, en-tête Referer) | 2 × 2 | moyen | Jeton dans le fragment `#` du lien de suivi (jamais envoyé au serveur), puis en en-tête `X-Tracking-Token` ; refusé dans l'URL ; `Referrer-Policy: no-referrer`, `Cache-Control: no-store` ; le suivi ne montre aucune donnée personnelle | V14.2.1 | J3 | **fait** |
 | T04 | Flux 1 | D | Rafale de fausses commandes qui noie la caisse | 2 × 2 | moyen | Limite de débit : 5 commandes par minute et 20 par heure, suivi 60 par minute (HTTP 429) ; statut « reçue » à confirmer par le staff (J7) | V6.1.1 | J3 | **fait** (limite) |
 | T05 | Flux 1 | T | Injection SQL par un champ de la commande | 1 × 3 | moyen | SQLAlchemy paramétré, entrées en liste blanche, ruff S608 et Bandit B608 ; Semgrep à J5 | V1.2.4 | J2 | **fait** |
-| T06 | web | T | Script injecté dans le prénom ou le repère, exécuté chez la caissière (XSS stocké) | 2 × 3 | élevé | Affichage en texte (React), CSP stricte sans script en ligne | V3.2.2 | J4 | prévu |
+| T06 | web | T | Script injecté dans le prénom ou le repère, exécuté chez la caissière (XSS stocké) | 2 × 3 | élevé | Affichage en texte (React), aucun HTML injecté (test), CSP à nonce sans script en ligne ; à revérifier sur l'écran de la caisse (J7) | V3.2.2 | J4 | **fait** (front client) |
 | T07 | Flux 6–8 | S | Vol du cookie de session d'une caissière | 1 × 3 | moyen | Cookie HttpOnly, Secure, SameSite ; 8 h max ; CSP | V3.3.1 | J6 | prévu |
 | T08 | Flux 8 | T | Requête forgée depuis un autre site (CSRF) pour annuler une commande | 1 × 3 | moyen | SameSite=Lax + jeton CSRF sur les requêtes qui modifient | V3.5.1 | J6 | prévu |
 | T09 | Flux 9 | E | Un caissier appelle directement une route de la gérante (pilotage, prix) | 2 × 3 | élevé | `require_role()` sur chaque route, test qui liste toutes les routes | V8.2.1 | J6 | prévu |
@@ -159,3 +159,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 28/09/2026 | 1.1 | T19 et T23 appliqués (réglages GitHub 12/12, projet Google Cloud et budget) |
 | 29/09/2026 | 2 | J2 : T05 (injection SQL) traitée par l'API : SQLAlchemy paramétré, entrées en liste blanche, tests d'injection |
 | 30/09/2026 | 3 | J3 : T01 à T04 traitées par l'API (commande côté serveur, jeton de suivi, limite de débit) |
+| 01/10/2026 | 4 | J4 : T06 traitée pour le front client (React, CSP à nonce) ; T03 complétée par le fragment `#` ; adresse du client transmise par le serveur web à l'API |

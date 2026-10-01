@@ -41,6 +41,7 @@ GOOD = {
                     {"context": "quality"},
                     {"context": "tests"},
                     {"context": "api"},
+                    {"context": "web"},
                 ],
             },
             "enforce_admins": {"enabled": True},
@@ -131,7 +132,7 @@ def test_ancien_format_contexts_accepte():
     prot = responses[f"/repos/{REPO}/branches/main/protection"][1]
     prot["required_status_checks"] = {
         "strict": True,
-        "contexts": ["secrets", "quality", "tests", "api"],
+        "contexts": ["secrets", "quality", "tests", "api", "web"],
     }
     assert by_id(v.run_checks(fake(responses), REPO))["R9"].ok
 

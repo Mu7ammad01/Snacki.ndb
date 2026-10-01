@@ -9,14 +9,16 @@
     }
   },
   "V1.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "React échappe le texte par défaut ; aucun dangerouslySetInnerHTML ; règle ESLint qui l'interdit."
+    "controle": "React n'insère que du texte (échappement automatique) ; aucun dangerouslySetInnerHTML, innerHTML, document.write ni eval dans le front, vérifié par un test qui parcourt les sources ; CSP à nonce.",
+    "preuve": "apps/web/tests/securite.test.ts (T06 · XSS)"
   },
   "V1.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "Liens wa.me construits avec encodeURIComponent ; paramètres d'URL côté API encodés par httpx."
+    "controle": "Lien wa.me construit avec encodeURIComponent ; jeton de suivi validé (base64url, 16 à 64 caractères) avant d'entrer dans l'URL du fragment.",
+    "preuve": "apps/web/src/lib/whatsapp.ts, apps/web/tests/commande.test.ts"
   },
   "V1.2.3": {
     "statut": "fait",
@@ -80,9 +82,10 @@
     "controle": "En-têtes X-Content-Type-Options: nosniff et Content-Type exact sur toutes les réponses ; CSP stricte."
   },
   "V3.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "Textes saisis affichés comme texte (React / textContent), jamais comme HTML."
+    "controle": "Textes saisis (prénom, repère, remarque) affichés comme texte par React et ramenés sur une seule ligne dans le message WhatsApp (oneLine) ; aucune insertion HTML.",
+    "preuve": "apps/web/src/lib/validate.ts, apps/web/tests/commande.test.ts"
   },
   "V3.3.1": {
     "statut": "prévu",
@@ -323,9 +326,10 @@
     "controle": ".dockerignore exclut .git ; image multi-étapes qui ne copie que le code utile ; vérifié par Trivy et un test."
   },
   "V14.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "Côté API (J3, fait) : jeton de suivi reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL, aucune donnée personnelle dans les URL (test_jeton_refuse_dans_l_url). Côté front (J4) : jeton placé dans le fragment d'URL (#)."
+    "controle": "API : jeton reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL. Front : lien /suivi#jeton, le fragment n'est jamais envoyé au serveur ; la page le lit et l'envoie en en-tête. Aucune donnée personnelle dans les URL.",
+    "preuve": "apps/api/tests/test_orders.py::test_jeton_refuse_dans_l_url, apps/web/src/lib/token.ts, apps/web/tests/securite.test.ts"
   },
   "V14.3.1": {
     "statut": "prévu",
