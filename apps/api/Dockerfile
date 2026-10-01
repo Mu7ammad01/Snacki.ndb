@@ -2,7 +2,7 @@
 # Construction : docker build -t snacki-api apps/api
 
 # --- Étape 1 : installer les dépendances dans un environnement isolé ---
-FROM python:3.12-slim AS build
+FROM python:3.14-slim AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
 COPY requirements.txt .
@@ -11,7 +11,7 @@ RUN python -m venv /venv \
  && /venv/bin/pip uninstall -y pip
 
 # --- Étape 2 : image finale, sans outils de construction ---
-FROM python:3.12-slim
+FROM python:3.14-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" SNACKI_ENVIRONMENT=prod
 # Utilisateur sans droits : une faille dans l'API ne donne pas la main sur le conteneur.
 # pip est retiré : inutile pour faire tourner l'API, c'est un outil de moins pour un attaquant.
