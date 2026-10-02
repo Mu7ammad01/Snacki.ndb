@@ -77,9 +77,10 @@
     "controle": "Machine à états des commandes (reçue → en préparation → prête → livrée) appliquée par l'API ; transition interdite = 409."
   },
   "V3.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "En-têtes X-Content-Type-Options: nosniff et Content-Type exact sur toutes les réponses ; CSP stricte."
+    "controle": "En-têtes nosniff, Content-Type exact et CSP sur toutes les réponses du web et de l'API ; vérifiés par les tests et par le contrôle de fumée de chaque déploiement.",
+    "preuve": "apps/api/tests/test_security.py, apps/web/tests/securite.test.ts, infra/gcp/deploy.sh"
   },
   "V3.2.2": {
     "statut": "fait",
@@ -93,14 +94,16 @@
     "controle": "Cookie de session __Host-snacki_session avec Secure, HttpOnly, SameSite=Lax, Path=/."
   },
   "V3.4.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "Strict-Transport-Security: max-age=31536000; includeSubDomains sur web et api."
+    "controle": "Strict-Transport-Security: max-age=31536000; includeSubDomains sur le web et l'API ; présence vérifiée à chaque déploiement.",
+    "preuve": "apps/web/next.config.ts, apps/api/src/snacki_api/main.py, infra/gcp/deploy.sh"
   },
   "V3.4.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "API non exposée au navigateur (appelée par web) : aucun en-tête CORS ; si besoin, origine fixe."
+    "controle": "API privée (IAM Cloud Run, 403 sans jeton), appelée seulement par le serveur web : aucun en-tête CORS servi.",
+    "preuve": "infra/gcp/setup-deploy.sh, infra/gcp/deploy.sh, docs/adr/0007-deploiement-cloud-run.md"
   },
   "V3.5.1": {
     "statut": "prévu",
@@ -311,14 +314,16 @@
     "controle": "TLS géré par Google (Cloud Run) et Neon : versions mesurées avec testssl.sh et consignées dans le rapport de pentest."
   },
   "V12.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "HTTPS partout, HSTS ; connexion Neon en sslmode=require ; aucun appel HTTP en clair."
+    "controle": "HTTPS uniquement (Cloud Run), HSTS ; base Neon en sslmode=require, imposé par la configuration de l'API en staging et en production ; web → API en HTTPS.",
+    "preuve": "apps/api/src/snacki_api/config.py, infra/gcp/setup-deploy.sh"
   },
   "V12.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "Certificats publics gérés par Google sur *.run.app."
+    "controle": "Certificats publics gérés par Google sur *.run.app.",
+    "preuve": "docs/adr/0007-deploiement-cloud-run.md"
   },
   "V13.4.1": {
     "statut": "fait",

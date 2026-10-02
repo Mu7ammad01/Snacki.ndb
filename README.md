@@ -62,6 +62,17 @@ pytest                        # tests des outils de sécurité
 
 Travailler toujours sur une branche (`git switch -c j2-socle-api`) : `main` n'accepte que des pull requests.
 
+## Déployer
+
+Chaque fusion sur `main` déclenche `.github/workflows/deploy.yml` après une CI verte : images construites et analysées une fois, publiées dans Artifact Registry, déployées en **staging**, puis en **production** après approbation dans GitHub ([ADR 0007](docs/adr/0007-deploiement-cloud-run.md)). Aucune clé Google n'est stockée : GitHub s'authentifie par Workload Identity Federation.
+
+| Service | Accès |
+| --- | --- |
+| `snacki-web-staging`, `snacki-web-prod` | public (HTTPS) |
+| `snacki-api-staging`, `snacki-api-prod` | privé : seul le serveur web du même environnement peut l'appeler |
+
+Mise en place, une seule fois : `./infra/gcp/setup-deploy.sh <projet> <propriétaire/dépôt>`.
+
 ## Organisation du dépôt
 
 ```
@@ -70,7 +81,7 @@ apps/web/        PWA Next.js (voir apps/web/README.md)
 docs/security/   modèle de menaces (as code + texte), ASVS, schéma de flux
 docs/adr/        décisions d'architecture
 infra/github/    réglages de sécurité du dépôt (branche protégée, alertes)
-infra/gcp/       projet Google Cloud, API, alerte de budget
+infra/gcp/       projet Google Cloud, budget, déploiement (comptes, secrets, Cloud Run)
 scripts/         outils Python : vérification du dépôt, ASVS, schéma de flux
 tests/           tests des outils
 ```

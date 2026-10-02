@@ -1,0 +1,12 @@
+[
+  {
+    "name": "supprimer-apres-7-jours",
+    "action": { "type": "Delete" },
+    "condition": { "tagState": "any", "olderThan": "7d" }
+  },
+  {
+    "name": "garder-les-3-dernieres",
+    "action": { "type": "Keep" },
+    "mostRecentVersions": { "keepCount": 3 }
+  }
+]

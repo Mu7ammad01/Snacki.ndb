@@ -1,6 +1,6 @@
 # Modèle de menaces de Snacki
 
-Version 5 · J5 (2 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
+Version 6 · J5 (2 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
 Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 24 menaces ci-dessous en découlent : 11 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4 et 1 à J5), les 13 autres ont leur jour de traitement dans le plan.
 
@@ -118,8 +118,8 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T18 | Flux 12 | T | Action GitHub tierce détournée (étiquette déplacée) | 1 × 3 | moyen | Actions épinglées par empreinte SHA, `permissions: contents: read`, `persist-credentials: false` | V15.2.1 | J1 | **fait** |
 | T19 | Flux 12 | T | Code poussé sur `main` sans revue ni tests | 2 × 3 | élevé | Branche protégée : PR obligatoire, portes vertes, pas de force-push | V15 | J1 | **fait** (appliqué le 28/09/2026 : 12/12 contrôles) |
 | T20 | Dépendances | T | Paquet PyPI ou npm vulnérable ou malveillant | 2 × 3 | élevé | Versions figées, Dependabot (pip, npm, docker, actions), pip-audit et npm audit bloquants (porte 6), Trivy bloquant sur les images (porte 7), gestionnaires de paquets retirés des images | V15.2.1 | J1 → J5 | **fait** |
-| T21 | Flux 13 | S | Clé de compte de service Google volée dans la CI | 1 × 3 | moyen | Aucune clé : Workload Identity Federation limitée au dépôt et à la branche `main` | V13 (N2) | J5 | prévu |
-| T22 | Secret Manager | E | L'API de staging lit les secrets de production | 1 × 3 | moyen | Un compte de service par environnement, droits au secret près | V13 (N2) | J5 | prévu |
+| T21 | Flux 13 | S | Clé de compte de service Google volée dans la CI | 1 × 3 | moyen | Aucune clé : Workload Identity Federation limitée à l'identifiant du dépôt, à `main` et au workflow `deploy.yml` ; accès de quelques minutes au seul compte `snacki-deployer` | V13 (N2) | J5 | **fait** (ADR 0007) |
+| T22 | Secret Manager | E | L'API de staging lit les secrets de production | 1 × 3 | moyen | Un compte de service par service et par environnement ; chaque secret lisible par la seule API de son environnement ; le déployeur ne lit aucun secret ; une branche Neon par environnement | V13 (N2) | J5 | **fait** (ADR 0007) |
 | T23 | Cloud | D | Abus qui fait exploser la facture | 2 × 2 | moyen | Alerte de budget à 1 €, `max-instances=2`, quotas IA | V6.1.1 | J1 | **fait** (appliqué le 28/09/2026 : budget de 1 EUR actif) |
 | T24 | Base | I | Vol ou perte des données (compte Neon compromis, suppression) | 1 × 3 | moyen | 2FA sur Neon et Google, historique de 6 h, export hebdomadaire chiffré | V11.3.2 | J14 | prévu |
 
@@ -141,7 +141,7 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | --- | --- | --- |
 | Le jeton de suivi passe dans le fragment `#` de l'URL, pas dans le chemin | T03 | [ADR 0003](../adr/0003-jeton-de-suivi-dans-le-fragment.md) |
 | Le suivi en direct utilise `fetch()` en flux (SSE) pour pouvoir envoyer le jeton en en-tête ; `EventSource` ne le permet pas | T03 | [ADR 0003](../adr/0003-jeton-de-suivi-dans-le-fragment.md) |
-| L'API n'est pas joignable depuis Internet : seul le compte de service de web peut l'appeler (IAM Cloud Run) | T01, T09 | [ADR 0001](../adr/0001-monorepo-et-stack.md) (à confirmer J5) |
+| L'API n'est pas joignable depuis Internet : seul le compte de service de web peut l'appeler (IAM Cloud Run) | T01, T09 | [ADR 0007](../adr/0007-deploiement-cloud-run.md) (contrôlé à chaque déploiement : 403 sans jeton) |
 | L'import de l'Excel historique est un script d'administration, pas un téléversement web | V5, V1.5.1 | [asvs-l1.md](asvs-l1.md) |
 | Seul un texte masqué part vers Gemini | T14 | [ADR 0004](../adr/0004-donnees-envoyees-a-l-ia.md) |
 | Les portes de sécurité sont actives dès le premier commit | T17–T20 | [ADR 0002](../adr/0002-securite-des-le-premier-commit.md) |
@@ -149,6 +149,8 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 ## 10. Risques acceptés
 
 - **Faux message WhatsApp** qui imite une commande de l'app : accepté, car le staff confirme chaque commande dans la conversation. Revu à l'étape où les commandes WhatsApp arrivent automatiquement.
+- **Staging déployé sans approbation** depuis `main` : accepté, car `main` exige une PR et 8 portes vertes ; la production exige l'approbation (ADR 0007).
+- **Limite de débit par instance** (2 instances au plus) : un client peut obtenir jusqu'au double de la limite. Revu si des abus apparaissent.
 - **TLS géré par Google et Neon** : versions non choisies par Snacki, mesurées à J14 (V12.1.1).
 
 ## 11. Journal des révisions
@@ -161,3 +163,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 30/09/2026 | 3 | J3 : T01 à T04 traitées par l'API (commande côté serveur, jeton de suivi, limite de débit) |
 | 01/10/2026 | 4 | J4 : T06 traitée pour le front client (React, CSP à nonce) ; T03 complétée par le fragment `#` ; adresse du client transmise par le serveur web à l'API |
 | 02/10/2026 | 5 | J5 (partie A) : T20 traitée (portes 6 et 7 : dépendances et images) ; images Docker non root ; CodeQL (porte 5) |
+| 02/10/2026 | 6 | J5 (partie B) : T21 et T22 traitées (déploiement sans clé, comptes et secrets par environnement) ; API privée confirmée (ADR 0007) |

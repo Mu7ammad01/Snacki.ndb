@@ -42,6 +42,8 @@ SECURITY_HEADERS = {
     # dans un navigateur (ASVS V3.2.1).
     "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "Cross-Origin-Resource-Policy": "same-site",
+    # HTTPS obligatoire pendant un an (Cloud Run ne sert que du HTTPS ; ASVS V3.4.1).
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 }
 
 

@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 19 fait · 28 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 24 fait · 23 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -33,11 +33,11 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V3.2.1 | Verify that security controls are in place to prevent browsers from rendering content or functionality in HTTP responses in an incorrect context (e.g., when … | prévu | J5 | En-têtes X-Content-Type-Options: nosniff et Content-Type exact sur toutes les réponses ; CSP stricte. |
+| V3.2.1 | Verify that security controls are in place to prevent browsers from rendering content or functionality in HTTP responses in an incorrect context (e.g., when … | fait | J5 | En-têtes nosniff, Content-Type exact et CSP sur toutes les réponses du web et de l'API ; vérifiés par les tests et par le contrôle de fumée de chaque déploiement. Preuve : `apps/api/tests/test_security.py, apps/web/tests/securite.test.ts, infra/gcp/deploy.sh`. |
 | V3.2.2 | Verify that content intended to be displayed as text, rather than rendered as HTML, is handled using safe rendering functions (such as createTextNode or … | fait | J4 | Textes saisis (prénom, repère, remarque) affichés comme texte par React et ramenés sur une seule ligne dans le message WhatsApp (oneLine) ; aucune insertion HTML. Preuve : `apps/web/src/lib/validate.ts, apps/web/tests/commande.test.ts`. |
 | V3.3.1 | Verify that cookies have the 'Secure' attribute set, and if the '\__Host-' prefix is not used for the cookie name, the '__Secure-' prefix must be used for the … | prévu | J6 | Cookie de session __Host-snacki_session avec Secure, HttpOnly, SameSite=Lax, Path=/. |
-| V3.4.1 | Verify that a Strict-Transport-Security header field is included on all responses to enforce an HTTP Strict Transport Security (HSTS) policy. A maximum age of … | prévu | J5 | Strict-Transport-Security: max-age=31536000; includeSubDomains sur web et api. |
-| V3.4.2 | Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header field is a fixed value by the application, or if the Origin HTTP … | prévu | J5 | API non exposée au navigateur (appelée par web) : aucun en-tête CORS ; si besoin, origine fixe. |
+| V3.4.1 | Verify that a Strict-Transport-Security header field is included on all responses to enforce an HTTP Strict Transport Security (HSTS) policy. A maximum age of … | fait | J5 | Strict-Transport-Security: max-age=31536000; includeSubDomains sur le web et l'API ; présence vérifiée à chaque déploiement. Preuve : `apps/web/next.config.ts, apps/api/src/snacki_api/main.py, infra/gcp/deploy.sh`. |
+| V3.4.2 | Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header field is a fixed value by the application, or if the Origin HTTP … | fait | J5 | API privée (IAM Cloud Run, 403 sans jeton), appelée seulement par le serveur web : aucun en-tête CORS servi. Preuve : `infra/gcp/setup-deploy.sh, infra/gcp/deploy.sh, docs/adr/0007-deploiement-cloud-run.md`. |
 | V3.5.1 | Verify that, if the application does not rely on the CORS preflight mechanism to prevent disallowed cross-origin requests to use sensitive functionality, … | prévu | J6 | Protection CSRF : SameSite=Lax + jeton CSRF (double soumission) sur les requêtes du staff qui modifient. |
 | V3.5.2 | Verify that, if the application relies on the CORS preflight mechanism to prevent disallowed cross-origin use of sensitive functionality, it is not possible … | N/A |  | Snacki ne s'appuie pas sur le preflight CORS pour se protéger (voir V3.5.1). |
 | V3.5.3 | Verify that HTTP requests to sensitive functionality use appropriate HTTP methods such as POST, PUT, PATCH, or DELETE, and not methods defined by the HTTP … | fait | J3 | Création en POST uniquement ; le suivi en GET est sans effet de bord, vérifié par test. Preuve : `apps/api/tests/test_orders.py : test_suivi_sans_effet_de_bord`. |
@@ -128,8 +128,8 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V12.1.1 | Verify that only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol must be … | à vérifier | J14 | TLS géré par Google (Cloud Run) et Neon : versions mesurées avec testssl.sh et consignées dans le rapport de pentest. |
-| V12.2.1 | Verify that TLS is used for all connectivity between a client and external facing, HTTP-based services, and does not fall back to insecure or unencrypted … | prévu | J5 | HTTPS partout, HSTS ; connexion Neon en sslmode=require ; aucun appel HTTP en clair. |
-| V12.2.2 | Verify that external facing services use publicly trusted TLS certificates. | prévu | J5 | Certificats publics gérés par Google sur *.run.app. |
+| V12.2.1 | Verify that TLS is used for all connectivity between a client and external facing, HTTP-based services, and does not fall back to insecure or unencrypted … | fait | J5 | HTTPS uniquement (Cloud Run), HSTS ; base Neon en sslmode=require, imposé par la configuration de l'API en staging et en production ; web → API en HTTPS. Preuve : `apps/api/src/snacki_api/config.py, infra/gcp/setup-deploy.sh`. |
+| V12.2.2 | Verify that external facing services use publicly trusted TLS certificates. | fait | J5 | Certificats publics gérés par Google sur *.run.app. Preuve : `docs/adr/0007-deploiement-cloud-run.md`. |
 
 ## V13 · Configuration
 
