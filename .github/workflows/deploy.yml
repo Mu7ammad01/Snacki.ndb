@@ -1,0 +1,135 @@
+# Déploiement continu (J5, ADR 0007) : après une CI entièrement verte sur main, les images sont
+# construites une seule fois, analysées (porte 7), publiées, puis déployées en staging. La production
+# reçoit exactement les mêmes images, après ton approbation dans GitHub (environnement « production »).
+#
+# Aucune clé Google n'est stockée dans GitHub : le job reçoit un jeton OIDC signé par GitHub, que
+# Google échange contre un accès de quelques minutes au compte snacki-deployer (Workload Identity
+# Federation). Google n'accepte que ce fichier, sur main, dans ce dépôt (infra/gcp/setup-deploy.sh).
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Un déploiement n'est jamais interrompu par le suivant : ils passent l'un après l'autre.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  SHA: ${{ github.event.workflow_run.head_sha }}
+  GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/snacki
+
+jobs:
+  build:
+    name: build
+    # Seulement après une CI verte déclenchée par un push sur main de CE dépôt. Une PR venue d'un
+    # fork peut porter une branche nommée « main » : l'événement et le dépôt d'origine sont vérifiés.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write   # jeton OIDC pour Google, rien d'autre
+    outputs:
+      api: ${{ steps.push.outputs.api }}
+      web: ${{ steps.push.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}   # exactement le commit testé par la CI
+          persist-credentials: false
+      - name: Construire les images
+        run: |
+          for s in api web; do docker build --pull -t "${REGISTRY}/${s}:${SHA}" "apps/${s}"; done
+      - name: Porte 7 · Trivy (api)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/api:${{ env.SHA }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Porte 7 · Trivy (web)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/web:${{ env.SHA }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      # L'accès à Google n'est demandé qu'une fois les images construites et analysées.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Publier dans Artifact Registry
+        id: push
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          for s in api web; do
+            docker push --quiet "${REGISTRY}/${s}:${SHA}"
+            echo "${s}=$(docker inspect --format '{{index .RepoDigests 0}}' "${REGISTRY}/${s}:${SHA}")" >> "$GITHUB_OUTPUT"
+          done
+
+  staging:
+    name: staging
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.web_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Déployer en staging
+        id: deploy
+        env:
+          API_IMAGE: ${{ needs.build.outputs.api }}
+          WEB_IMAGE: ${{ needs.build.outputs.web }}
+        run: ./infra/gcp/deploy.sh staging "$API_IMAGE" "$WEB_IMAGE"
+
+  production:
+    name: production
+    needs: [build, staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: production   # attend ton approbation dans GitHub
+      url: ${{ steps.deploy.outputs.web_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Déployer en production (mêmes images que staging)
+        id: deploy
+        env:
+          API_IMAGE: ${{ needs.build.outputs.api }}
+          WEB_IMAGE: ${{ needs.build.outputs.web }}
+        run: ./infra/gcp/deploy.sh prod "$API_IMAGE" "$WEB_IMAGE"

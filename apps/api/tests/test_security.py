@@ -97,6 +97,7 @@ def test_en_tetes_de_securite(client):
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["x-frame-options"] == "DENY"
     assert "default-src 'none'" in r.headers["content-security-policy"]
+    assert r.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
 
 
 def test_cors_origine_fixe(settings):
