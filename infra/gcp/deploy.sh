@@ -22,32 +22,43 @@ API="snacki-api-${ENV}"
 WEB="snacki-web-${ENV}"
 SA_API="${API}@${PROJECT}.iam.gserviceaccount.com"
 SA_WEB="${WEB}@${PROJECT}.iam.gserviceaccount.com"
-DB_SECRET="SNACKI_DATABASE_URL=snacki-db-url-${ENV}:latest"
+OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID:?OAUTH_CLIENT_ID manquant (variable GitHub, setup-auth.sh)}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+# Secrets lus par l'API au démarrage, depuis Secret Manager (jamais dans GitHub ni dans l'image).
+SECRETS="SNACKI_DATABASE_URL=snacki-db-url-${ENV}:latest"
+SECRETS+=",SNACKI_OAUTH_CLIENT_SECRET=snacki-oauth-secret-${ENV}:latest"
+SECRETS+=",SNACKI_SESSION_SECRET=snacki-session-key-${ENV}:latest"
 GCLOUD=(--project "$PROJECT" --region "$REGION" --quiet)
 # Garde-fous de coût (T23) : jamais plus de 2 instances, zéro instance au repos.
 LIMITS=(--min-instances 0 --max-instances 2 --cpu 1 --memory 512Mi --concurrency 40 --timeout 30s)
 
 fail() { echo "ÉCHEC : $*" >&2; exit 1; }
 
-echo "1/4 Migration de la base (${ENV}) : Cloud Run Job, avant la nouvelle version de l'API"
+# Adresse publique du web : connue avant le déploiement (service créé par setup-deploy.sh). Elle
+# fixe l'adresse de retour OAuth et l'origine acceptée par le web (jamais l'en-tête Host).
+WEB_URL="$(gcloud run services describe "$WEB" "${GCLOUD[@]}" --format 'value(status.url)')"
+API_ENV="SNACKI_ENVIRONMENT=${ENV},SNACKI_OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}"
+API_ENV+=",SNACKI_OAUTH_REDIRECT_URI=${WEB_URL}/auth/callback"
+
+echo "1/4 Migration de la base (${ENV}) et premier admin : Cloud Run Job, avant la nouvelle API"
 gcloud run jobs deploy "snacki-migrate-${ENV}" "${GCLOUD[@]}" --image "$API_IMAGE" \
-  --service-account "$SA_API" --set-secrets "$DB_SECRET" --set-env-vars "SNACKI_ENVIRONMENT=${ENV}" \
-  --command alembic --args upgrade,head --max-retries 0 --task-timeout 300s \
+  --service-account "$SA_API" --set-secrets "$SECRETS" \
+  --set-env-vars "${API_ENV},SNACKI_BOOTSTRAP_ADMIN_EMAIL=${ADMIN_EMAIL}" \
+  --command python --args=-m,snacki_api.manage,migrate --max-retries 0 --task-timeout 300s \
   --labels "app=snacki,env=${ENV}" --execute-now --wait
 
 echo "2/4 API (${ENV}) : privée, n'accepte que le jeton du serveur web"
 # Pas d'option --allow-unauthenticated : les droits posés par setup-deploy.sh sont conservés.
 gcloud run deploy "$API" "${GCLOUD[@]}" --image "$API_IMAGE" --service-account "$SA_API" \
-  --set-secrets "$DB_SECRET" \
-  --set-env-vars "SNACKI_ENVIRONMENT=${ENV},SNACKI_TRUST_FORWARDED_FOR=true" \
+  --set-secrets "$SECRETS" \
+  --set-env-vars "${API_ENV},SNACKI_TRUST_FORWARDED_FOR=true" \
   --labels "app=snacki,env=${ENV}" "${LIMITS[@]}"
 API_URL="$(gcloud run services describe "$API" "${GCLOUD[@]}" --format 'value(status.url)')"
 
 echo "3/4 Web (${ENV}) : public, appelle l'API avec son jeton d'identité"
 gcloud run deploy "$WEB" "${GCLOUD[@]}" --image "$WEB_IMAGE" --service-account "$SA_WEB" \
-  --set-env-vars "SNACKI_API_URL=${API_URL},SNACKI_API_AUTH=gcp" \
+  --set-env-vars "SNACKI_API_URL=${API_URL},SNACKI_API_AUTH=gcp,SNACKI_PUBLIC_URL=${WEB_URL}" \
   --labels "app=snacki,env=${ENV}" "${LIMITS[@]}"
-WEB_URL="$(gcloud run services describe "$WEB" "${GCLOUD[@]}" --format 'value(status.url)')"
 
 echo "4/4 Contrôles de fumée"
 # Cloud Run réserve certains chemins finissant par « z » (/healthz) : on teste /v1/menu.
@@ -63,6 +74,13 @@ echo "    web : 200, CSP à nonce, HSTS"
 # Le nom du produit vient de la base : s'il est dans la page, la chaîne web → API → Neon fonctionne.
 curl -fsS "${WEB_URL}/" | grep -q 'Salade de fruits' || fail "menu absent : le web n'atteint pas l'API"
 echo "    menu lu dans la base, via l'API privée"
+
+# Espace staff : la page de connexion répond, l'espace lui-même renvoie vers la connexion.
+code="$(curl -s -o /dev/null -w '%{http_code}' "${WEB_URL}/connexion")"
+[ "$code" = "200" ] || fail "page de connexion du staff : ${code}"
+where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${WEB_URL}/staff")"
+[[ "$where" == 307*"/connexion" ]] || fail "l'espace staff doit renvoyer vers la connexion (${where})"
+echo "    espace staff : fermé sans session"
 
 echo "Version déployée en ${ENV} : ${WEB_URL}"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "web_url=${WEB_URL}" >>"$GITHUB_OUTPUT"; fi

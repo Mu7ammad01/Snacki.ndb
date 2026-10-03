@@ -1,9 +1,10 @@
-"""Tables de la base. J2 : le catalogue. J3 : les commandes et leurs lignes."""
+"""Tables de la base. J2 : le catalogue. J3 : les commandes. J6 : le staff et le journal d'audit."""
 
 import enum
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Date,
     DateTime,
@@ -134,3 +135,43 @@ class OrderLine(Base):
     @property
     def line_total_mru(self) -> int:
         return self.quantity * self.unit_price_mru
+
+
+class StaffRole(enum.StrEnum):
+    CAISSIER = "caissier"  # caisse : commandes du jour, encaissement
+    GERANTE = "gerante"  # + annulations, prix, pilotage
+    ADMIN = "admin"  # + gestion de l'équipe
+
+
+class StaffUser(Base):
+    """Membre du staff. Seules les adresses de cette table peuvent se connecter (liste blanche)."""
+
+    __tablename__ = "staff_user"
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="email_lowercase"),
+        CheckConstraint("session_version >= 1", name="session_version_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(254), unique=True)
+    display_name: Mapped[str | None] = mapped_column(String(80))
+    role: Mapped[StaffRole] = mapped_column(_enum(StaffRole, "staff_role"))
+    active: Mapped[bool] = mapped_column(default=True)
+    # Augmenté à chaque déconnexion, changement de rôle ou désactivation : toutes les sessions
+    # ouvertes deviennent invalides à la requête suivante (T12).
+    session_version: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuditLog(Base):
+    """Journal d'audit : qui a fait quoi, quand. L'API n'a aucune route pour le modifier (T11)."""
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
+    action: Mapped[str] = mapped_column(String(40))
+    target: Mapped[str | None] = mapped_column(String(120))
+    detail: Mapped[dict | None] = mapped_column(JSON)

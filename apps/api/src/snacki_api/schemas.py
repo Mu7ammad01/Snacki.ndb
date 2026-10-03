@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-from snacki_api.models import Badge, Category, Fulfilment, OrderStatus
+from snacki_api.models import Badge, Category, Fulfilment, OrderStatus, StaffRole
 
 
 class ProductOut(BaseModel):
@@ -122,3 +122,69 @@ class OrderCreatedOut(OrderTrackOut):
     # Renvoyé une seule fois, à la création : l'API n'en garde que l'empreinte.
     tracking_token: str
     tracking_expires_at: datetime
+
+
+# --- Connexion et équipe (J6) -----------------------------------------------------------
+
+# Adresse e-mail : forme simple et longueur bornée ; Google a déjà vérifié l'adresse réelle.
+Email = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        to_lower=True,
+        max_length=254,
+        pattern=r"^[^@\s]{1,64}@[^@\s]+\.[a-z]{2,}$",
+    ),
+]
+
+
+class AuthStartOut(BaseModel):
+    authorization_url: str
+    flow: str  # jeton de parcours signé, gardé par le web dans un cookie HttpOnly
+
+
+class AuthCallbackIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=10, max_length=512, pattern=r"^[\x21-\x7e]+$")
+    state: str = Field(min_length=16, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    flow: str = Field(min_length=20, max_length=2048, pattern=r"^[A-Za-z0-9_.-]+$")
+
+
+class StaffMeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    display_name: str | None
+    role: StaffRole
+
+
+class AuthSessionOut(BaseModel):
+    session: str  # jeton de session signé, posé par le web dans un cookie HttpOnly
+    staff: StaffMeOut
+
+
+class StaffOut(StaffMeOut):
+    active: bool
+    last_login_at: datetime | None
+
+
+class StaffCreateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: Email
+    role: StaffRole
+
+
+class StaffUpdateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: StaffRole | None = None
+    active: bool | None = None
+
+    @model_validator(mode="after")
+    def _au_moins_un(self) -> "StaffUpdateIn":
+        if self.role is None and self.active is None:
+            raise ValueError("Indiquez un rôle ou un état")
+        return self

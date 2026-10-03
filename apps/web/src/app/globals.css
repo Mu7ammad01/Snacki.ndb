@@ -192,3 +192,20 @@ button{cursor:pointer}
 .timeline li.cancel{color:var(--berry)}
 .ph.empty{display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:28px;color:var(--ink-3)}
 a.ghost{display:block;text-align:center;text-decoration:none}
+
+/* Espace staff (J6) */
+.staff h1{font-family:var(--display);font-weight:800;font-size:24px;margin:0}
+.staff h2{font-family:var(--display);font-weight:800;font-size:20px;margin:0 0 4px}
+.staff .primary{margin-top:12px}
+.small-note{margin-top:10px;text-align:center}
+.staff-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:8px 2px}
+.staff-head .ghost{width:auto;padding:8px 14px}
+.staff-grid{display:grid;gap:0}
+.team{list-style:none;padding:0;margin:14px 0;display:grid;gap:10px}
+.team li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:14px;padding:10px 12px}
+.team li.off{opacity:.6}
+.team li > div:first-child{display:grid}
+.team-actions{display:flex;gap:8px;align-items:center}
+.team-actions select{border:1.5px solid var(--line);border-radius:12px;padding:8px;background:var(--surface)}
+.team-actions .ghost{width:auto;padding:8px 12px}
+.team-add{margin-top:8px}

@@ -14,18 +14,25 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from snacki_api import orders, repository
+from snacki_api import auth, orders, repository, staff
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
-from snacki_api.models import Category
+from snacki_api.models import Category, StaffRole, StaffUser
 from snacki_api.ratelimit import DEFAULT_RULES, RateLimiter
 from snacki_api.schemas import (
+    AuthCallbackIn,
+    AuthSessionOut,
+    AuthStartOut,
     Health,
     MenuOut,
     OrderCreatedOut,
     OrderIn,
     OrderTrackOut,
     ProductOut,
+    StaffCreateIn,
+    StaffMeOut,
+    StaffOut,
+    StaffUpdateIn,
 )
 
 log = logging.getLogger("snacki.api")
@@ -48,6 +55,9 @@ SECURITY_HEADERS = {
 
 
 TRACKING_HEADER = "X-Tracking-Token"
+SESSION_HEADER = "X-Staff-Session"  # posé par le serveur web à partir du cookie HttpOnly
+LOGIN_REFUSED = "Connexion refusée"
+ALL_STAFF = (StaffRole.CAISSIER, StaffRole.GERANTE, StaffRole.ADMIN)
 NOT_FOUND = "Commande introuvable ou lien expiré"
 
 
@@ -57,11 +67,17 @@ class Utf8JSONResponse(JSONResponse):
     media_type = "application/json; charset=utf-8"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = None) -> FastAPI:
     settings = settings or get_settings()
+    if oidc is None and settings.auth_enabled:
+        oidc = auth.GoogleOIDC(
+            settings.oauth_client_id,
+            settings.oauth_client_secret.get_secret_value(),  # type: ignore[union-attr]
+            settings.oauth_redirect_uri,
+        )
     app = FastAPI(
         title="Snacki API",
-        version="0.4.0",
+        version="0.6.0",
         default_response_class=Utf8JSONResponse,
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url=None,
@@ -103,7 +119,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)
-        if request.url.path.startswith("/v1/orders"):
+        if request.url.path.startswith(("/v1/orders", "/v1/auth", "/v1/staff")):
             # Réponses avec jeton ou données de commande : jamais en cache.
             response.headers["Cache-Control"] = "no-store"
         return response
@@ -173,6 +189,121 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Même réponse pour « inconnu », « expiré » et « mal formé » : rien à deviner.
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return OrderTrackOut.model_validate(order)
+
+    # --- Connexion du staff (J6) ------------------------------------------------------------
+
+    def session_secret() -> str:
+        if not (settings.auth_enabled and oidc):
+            raise HTTPException(status_code=503, detail="Connexion du staff non configurée")
+        return settings.session_secret.get_secret_value()  # type: ignore[union-attr]
+
+    def require_role(*roles: StaffRole):
+        """Dépendance de contrôle d'accès : session valide, compte actif, rôle autorisé.
+
+        Le rôle est relu en base à chaque requête : un changement ou une désactivation
+        s'applique tout de suite (T12). Un refus de rôle est inscrit au journal (T09).
+        """
+
+        def dependency(
+            request: Request,
+            session: SessionDep,
+            token: Annotated[str | None, Header(alias=SESSION_HEADER)] = None,
+        ) -> StaffUser:
+            secret = session_secret()
+            try:
+                staff_id, version = auth.read_session(secret, token or "")
+            except auth.AuthError:
+                raise HTTPException(status_code=401, detail="Session absente ou expirée") from None
+            user = session.get(StaffUser, staff_id)
+            if user is None or not user.active or user.session_version != version:
+                raise HTTPException(status_code=401, detail="Session absente ou expirée")
+            if user.role not in roles:
+                staff.audit(session, "access_denied", user, f"{request.method} {request.url.path}")
+                session.commit()
+                raise HTTPException(status_code=403, detail="Accès réservé")
+            return user
+
+        dependency.snacki_roles = roles  # type: ignore[attr-defined]  # lu par le test des routes
+        return dependency
+
+    StaffDep = Annotated[StaffUser, Depends(require_role(*ALL_STAFF))]
+    AdminDep = Annotated[StaffUser, Depends(require_role(StaffRole.ADMIN))]
+
+    @app.post("/v1/auth/start", response_model=AuthStartOut, tags=["connexion"])
+    def auth_start(request: Request) -> AuthStartOut:
+        """Prépare la connexion Google : state, nonce et PKCE, signés dans un jeton de parcours."""
+        rate_limit("auth", request)
+        secret = session_secret()
+        flow, values = auth.new_flow(secret)
+        url = oidc.authorization_url(values["state"], values["nonce"], values["challenge"])  # type: ignore[union-attr]
+        return AuthStartOut(authorization_url=url, flow=flow)
+
+    @app.post("/v1/auth/callback", response_model=AuthSessionOut, tags=["connexion"])
+    def auth_callback(
+        data: AuthCallbackIn, request: Request, session: SessionDep
+    ) -> AuthSessionOut:
+        """Retour de Google. Toute erreur donne la même réponse ; le motif va au journal."""
+        rate_limit("auth", request)
+        secret = session_secret()
+        email = None
+        try:
+            flow = auth.read_flow(secret, data.flow, data.state)
+            id_token = oidc.exchange_code(data.code, flow["verifier"])  # type: ignore[union-attr]
+            identity = oidc.verify_id_token(id_token, flow["nonce"])  # type: ignore[union-attr]
+            email = identity.email
+            user = staff.by_email(session, email)
+            if user is None or not user.active:
+                raise auth.AuthError("adresse absente de l'équipe ou compte désactivé")
+        except auth.AuthError as exc:
+            log.warning("Connexion refusée : %s", exc)
+            staff.audit(session, "login_refused", None, email, {"motif": str(exc)[:200]})
+            session.commit()
+            raise HTTPException(status_code=401, detail=LOGIN_REFUSED) from None
+        staff.record_login(session, user, identity.name)
+        session.commit()
+        token = auth.new_session(secret, user.id, user.session_version, settings.session_hours)
+        return AuthSessionOut(session=token, staff=StaffMeOut.model_validate(user))
+
+    @app.post("/v1/auth/logout", status_code=204, tags=["connexion"])
+    def auth_logout(user: StaffDep, session: SessionDep) -> None:
+        """Déconnexion : toutes les sessions de ce compte deviennent invalides."""
+        staff.logout(session, user)
+        session.commit()
+
+    @app.get("/v1/staff/me", response_model=StaffMeOut, tags=["équipe"])
+    def staff_me(user: StaffDep) -> StaffMeOut:
+        return StaffMeOut.model_validate(user)
+
+    @app.get("/v1/staff", response_model=list[StaffOut], tags=["équipe"])
+    def staff_list(_admin: AdminDep, session: SessionDep) -> list[StaffOut]:
+        return [StaffOut.model_validate(u) for u in staff.list_staff(session)]
+
+    @app.post("/v1/staff", response_model=StaffOut, status_code=201, tags=["équipe"])
+    def staff_add(data: StaffCreateIn, admin: AdminDep, session: SessionDep) -> StaffOut:
+        try:
+            user = staff.add(session, admin, data.email, data.role)
+        except staff.StaffError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        session.commit()
+        return StaffOut.model_validate(user)
+
+    @app.patch("/v1/staff/{staff_id}", response_model=StaffOut, tags=["équipe"])
+    def staff_update(
+        staff_id: Annotated[int, Path(ge=1)],
+        data: StaffUpdateIn,
+        admin: AdminDep,
+        session: SessionDep,
+    ) -> StaffOut:
+        user = session.get(StaffUser, staff_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="Membre introuvable")
+        try:
+            staff.update(session, admin, user, data.role, data.active)
+        except staff.StaffError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        session.commit()
+        return StaffOut.model_validate(user)
 
     return app
 
