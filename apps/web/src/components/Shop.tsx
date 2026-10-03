@@ -165,7 +165,7 @@ export default function Shop({ products }: { products: Product[] | null }) {
         )}
 
         <footer className="contact">
-          <div>{t.waLabel} <b dir="ltr">{CONTACT.whatsappDisplay}</b> · {t.callLabel} <b dir="ltr">{CONTACT.call}</b></div>
+          <div>{t.waLabel} <b dir="ltr">{CONTACT.whatsappDisplay}</b></div>
           <div>TikTok <b dir="ltr">@snackifood</b></div>
           <div className="pay" aria-label={t.payment}>{PAYMENTS.map((p) => <span key={p.id}>{p[lang]}</span>)}</div>
         </footer>
