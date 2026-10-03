@@ -17,8 +17,8 @@
   "V1.2.2": {
     "statut": "fait",
     "jour": "J4",
-    "controle": "Lien wa.me construit avec encodeURIComponent ; jeton de suivi validé (base64url, 16 à 64 caractères) avant d'entrer dans l'URL du fragment.",
-    "preuve": "apps/web/src/lib/whatsapp.ts, apps/web/tests/commande.test.ts"
+    "controle": "Lien wa.me construit avec encodeURIComponent ; le message de contact ne reprend que le numéro de commande s'il respecte le motif SNK-AAAA-NNN ; liens tel: construits seulement pour un numéro mauritanien valide ; jeton de suivi validé avant d'entrer dans l'URL du fragment.",
+    "preuve": "apps/web/src/lib/whatsapp.ts, apps/web/src/lib/caisse.ts, apps/web/tests/commande.test.ts, apps/web/tests/caisse.test.ts"
   },
   "V1.2.3": {
     "statut": "fait",
@@ -72,9 +72,10 @@
     "preuve": "apps/api/tests/test_orders.py : test_prix_envoye_par_le_client_refuse, test_total_calcule_par_le_serveur"
   },
   "V2.3.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J7",
-    "controle": "Machine à états des commandes (reçue → en préparation → prête → livrée) appliquée par l'API ; transition interdite = 409."
+    "controle": "Machine à états des commandes appliquée par l'API (reçue → acceptée → en préparation → prête → remise ; refus depuis « reçue », annulation en cours, gérante ou admin) ; transition absente du tableau = 409, commande verrouillée (SELECT … FOR UPDATE) ; remise d'une livraison impossible avant l'appel au client ; encaissement unique.",
+    "preuve": "apps/api/src/snacki_api/caisse.py, apps/api/tests/test_caisse.py::test_transitions_interdites"
   },
   "V3.2.1": {
     "statut": "fait",
@@ -123,9 +124,10 @@
     "preuve": "apps/api/tests/test_orders.py : test_suivi_sans_effet_de_bord"
   },
   "V4.1.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J7",
-    "controle": "Content-Type JSON avec charset fixé par l'API pour toutes les routes (fait, J2-J3, testé) ; flux SSE en text/event-stream à vérifier à J7."
+    "controle": "Toutes les réponses de l'API sont du JSON avec charset fixé (Utf8JSONResponse) ; pas de flux SSE (suivi par interrogation périodique, ADR 0009).",
+    "preuve": "apps/api/tests/test_security.py::test_en_tetes_de_securite, apps/api/tests/test_caisse.py"
   },
   "V4.4.1": {
     "statut": "N/A",

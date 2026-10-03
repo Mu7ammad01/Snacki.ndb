@@ -7,8 +7,10 @@ import { applyLang, store } from "@/lib/storage";
 import { tokenFromHash } from "@/lib/token";
 import type { Lang, OrderStatus, OrderTrack } from "@/lib/types";
 
-const STEPS: OrderStatus[] = ["recue", "en_preparation", "prete", "livree"];
-const REFRESH_MS = 15_000; // le suivi en direct (SSE) arrive à J7
+const STEPS: OrderStatus[] = ["recue", "acceptee", "en_preparation", "prete", "livree"];
+// Interrogation toutes les 10 s : simple et fiable sur Cloud Run (ADR 0009).
+const REFRESH_MS = 10_000;
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 
 export default function TrackView() {
   const [lang, setLang] = useState<Lang>("fr");
@@ -48,13 +50,25 @@ export default function TrackView() {
           <>
             <div className="done-num"><div className="k">{t.orderNo}</div><div className="v">{order.number}</div></div>
             <ol className="timeline">
-              {order.status === "annulee"
-                ? <li className="cancel">{t.status.annulee}</li>
-                : STEPS.filter((s) => s !== "livree" || order.fulfilment === "livraison").map((s, i) => (
-                    <li key={s} className={i <= reached ? "done" : ""}>{t.status[s]}</li>
+              {order.status === "annulee" || order.status === "refusee"
+                ? <li className="cancel">{t.status[order.status]}</li>
+                : STEPS.map((s, i) => (
+                    <li key={s} className={i <= reached ? "done" : ""}>
+                      {s === "livree" && order.fulfilment === "emporter" ? t.handedPickup : t.status[s]}
+                    </li>
                   ))}
             </ol>
-            <div className="sum big"><span>{t.total}</span><span>{fmt(order.total_mru)} MRU</span></div>
+            {order.closed_reason && <p className="alert bad">{t.reason} : {order.closed_reason}</p>}
+            {order.ready_at && !["livree", "refusee", "annulee"].includes(order.status) && (
+              <p className="alert">{t.readyAt(hhmm(order.ready_at))}</p>
+            )}
+            {order.delivery_fee_mru > 0 && (
+              <>
+                <div className="sum"><span>{t.articles}</span><span>{fmt(order.total_mru)} MRU</span></div>
+                <div className="sum"><span>{t.fee}</span><span>{fmt(order.delivery_fee_mru)} MRU</span></div>
+              </>
+            )}
+            <div className="sum big"><span>{order.delivery_fee_mru > 0 ? t.toPay : t.total}</span><span>{fmt(order.grand_total_mru)} MRU</span></div>
             <p className="muted gap10">{t.trackRefresh}</p>
           </>
         )}

@@ -7,9 +7,9 @@ import { type Cart, cartCount, estimateTotal, sanitizeCart, setQty, toItems } fr
 import { CONTACT, PAYMENTS, T, ZONES, fmt } from "@/lib/i18n";
 import { applyLang, store } from "@/lib/storage";
 import { trackingPath } from "@/lib/token";
-import type { Category, Lang, OrderCreated, OrderRequest, Product } from "@/lib/types";
+import type { Category, Lang, OrderCreated, OrderRequest, PaymentMethod, Product } from "@/lib/types";
 import { type FieldError, type InfoForm, normalizePhone, oneLine, validateInfo } from "@/lib/validate";
-import { buildMessage, waLink } from "@/lib/whatsapp";
+import { contactMessage, waLink } from "@/lib/whatsapp";
 
 type Step = null | "cart" | "info" | "done";
 interface Form extends InfoForm { pay: string; note: string }
@@ -62,6 +62,9 @@ export default function Shop({ products }: { products: Product[] | null }) {
       fulfilment: form.mode,
       items: toItems(cart),
       ...(form.mode === "livraison" ? { landmark: `${zone.fr} — ${oneLine(form.landmark)}` } : {}),
+      // Ces informations allaient dans le message WhatsApp ; elles arrivent maintenant en caisse.
+      ...(PAYMENTS.some((p) => p.id === form.pay) ? { pay_pref: form.pay as PaymentMethod } : {}),
+      ...(oneLine(form.note) ? { note: oneLine(form.note).slice(0, 200) } : {}),
     };
     setSending(true); setError(null);
     try {
@@ -84,9 +87,6 @@ export default function Shop({ products }: { products: Product[] | null }) {
     setForm((f) => ({ ...f, note: "" })); setStep(null); window.scrollTo({ top: 0 });
   }
 
-  const message = order
-    ? buildMessage({ lang, order, products: byId, name: form.name, phone: normalizePhone(form.phone), zone: form.zone, landmark: form.landmark, pay: form.pay, note: form.note })
-    : "";
 
   const Qty = ({ p, compact }: { p: Product; compact?: boolean }) => {
     const q = cart[p.id] ?? 0;
@@ -283,13 +283,12 @@ export default function Shop({ products }: { products: Product[] | null }) {
                 <div className="sbody">
                   <div className="done-num"><div className="k">{t.orderNo}</div><div className="v">{order.number}</div></div>
                   <div className="sum big"><span>{t.total}</span><span>{fmt(order.total_mru)} MRU</span></div>
-                  <div className="msg" dir={lang === "ar" ? "rtl" : "ltr"}>{message}</div>
-                  <p className="muted gap10">{t.waHelp}</p>
+                  <p className="alert">{t.sentToShop}</p>
                   <p className="muted gap6">{t.after}</p>
                 </div>
                 <div className="sfoot">
-                  <a className="primary wa" href={waLink(message)} target="_blank" rel="noopener noreferrer"><Wa />{t.sendWa}</a>
-                  <a className="ghost" href={trackingPath(order.tracking_token)}>{t.track}</a>
+                  <a className="primary" href={trackingPath(order.tracking_token)}>{t.track}</a>
+                  <a className="contact-wa" href={waLink(contactMessage(lang, order.number))} target="_blank" rel="noopener noreferrer"><Wa />{t.contactWa}</a>
                   <button type="button" className="ghost" onClick={newOrder}>{t.newOrder}</button>
                 </div>
               </>

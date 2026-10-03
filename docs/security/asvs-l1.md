@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 42 fait · 5 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 44 fait · 3 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -12,7 +12,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V1.2.1 | Verify that output encoding for an HTTP response, HTML document, or XML document is relevant for the context required, such as encoding the relevant … | fait | J4 | React n'insère que du texte (échappement automatique) ; aucun dangerouslySetInnerHTML, innerHTML, document.write ni eval dans le front, vérifié par un test qui parcourt les sources ; CSP à nonce. Preuve : `apps/web/tests/securite.test.ts (T06 · XSS)`. |
-| V1.2.2 | Verify that when dynamically building URLs, untrusted data is encoded according to its context (e.g., URL encoding or base64url encoding for query or path … | fait | J4 | Lien wa.me construit avec encodeURIComponent ; jeton de suivi validé (base64url, 16 à 64 caractères) avant d'entrer dans l'URL du fragment. Preuve : `apps/web/src/lib/whatsapp.ts, apps/web/tests/commande.test.ts`. |
+| V1.2.2 | Verify that when dynamically building URLs, untrusted data is encoded according to its context (e.g., URL encoding or base64url encoding for query or path … | fait | J4 | Lien wa.me construit avec encodeURIComponent ; le message de contact ne reprend que le numéro de commande s'il respecte le motif SNK-AAAA-NNN ; liens tel: construits seulement pour un numéro mauritanien valide ; jeton de suivi validé avant d'entrer dans l'URL du fragment. Preuve : `apps/web/src/lib/whatsapp.ts, apps/web/src/lib/caisse.ts, apps/web/tests/commande.test.ts, apps/web/tests/caisse.test.ts`. |
 | V1.2.3 | Verify that output encoding or escaping is used when dynamically building JavaScript content (including JSON), to avoid changing the message or document … | fait | J3 | JSON produit uniquement par Pydantic/FastAPI (sérialisation sûre), jamais par concaténation de chaînes. Preuve : `apps/api/src/snacki_api/schemas.py, main.py (Utf8JSONResponse)`. |
 | V1.2.4 | Verify that data selection or database queries (e.g., SQL, HQL, NoSQL, Cypher) use parameterized queries, ORMs, entity frameworks, or are otherwise protected … | fait | J2 | SQLAlchemy 2 (select, paramètres liés) pour toute requête ; entrées en liste blanche (Enum, motif d'identifiant) ; ruff S608 et Bandit B608 bloquants. Semgrep s'ajoute à J5. Preuve : `apps/api/src/snacki_api/repository.py, apps/api/tests/test_security.py (7 tests d’injection)`. |
 | V1.2.5 | Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line … | fait | J1 | Aucun appel shell dans l'application ; ruff S602/S605 et Bandit B602/B605 bloquants en pre-commit et en CI. Preuve : `.pre-commit-config.yaml, pyproject.toml [tool.ruff.lint]`. |
@@ -27,7 +27,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | V2.1.1 | Verify that the application's documentation defines input validation rules for how to check the validity of data items against an expected structure. This … | fait | J3 | Règles de validation documentées par les schémas Pydantic (OrderIn, OrderItemIn), exportés dans la documentation OpenAPI (/docs en dev). Preuve : `apps/api/src/snacki_api/schemas.py`. |
 | V2.2.1 | Verify that input is validated to enforce business or functional expectations for that input. This should either use positive validation against an allow list … | fait | J3 | Validation positive : produits du menu (identifiant en liste blanche, disponibilité en base), quantités 1 à 20, 1 à 10 lignes sans doublon, téléphone mauritanien à 8 chiffres (2, 3 ou 4), prénom 1 à 40 caractères sans caractère de contrôle, repère obligatoire en livraison. Preuve : `apps/api/src/snacki_api/schemas.py, apps/api/tests/test_orders.py (tests de lignes, téléphone, prénom, repère)`. |
 | V2.2.2 | Verify that the application is designed to enforce input validation at a trusted service layer. While client-side validation improves usability and should be … | fait | J3 | Toute validation refaite dans l'API ; la validation du front n'est qu'une aide à la saisie. Champs inconnus refusés (extra=forbid) : un prix ou un total envoyé par le client rend la requête invalide. Preuve : `apps/api/tests/test_orders.py : test_prix_envoye_par_le_client_refuse, test_total_calcule_par_le_serveur`. |
-| V2.3.1 | Verify that the application will only process business logic flows for the same user in the expected sequential step order and without skipping steps. | prévu | J7 | Machine à états des commandes (reçue → en préparation → prête → livrée) appliquée par l'API ; transition interdite = 409. |
+| V2.3.1 | Verify that the application will only process business logic flows for the same user in the expected sequential step order and without skipping steps. | fait | J7 | Machine à états des commandes appliquée par l'API (reçue → acceptée → en préparation → prête → remise ; refus depuis « reçue », annulation en cours, gérante ou admin) ; transition absente du tableau = 409, commande verrouillée (SELECT … FOR UPDATE) ; remise d'une livraison impossible avant l'appel au client ; encaissement unique. Preuve : `apps/api/src/snacki_api/caisse.py, apps/api/tests/test_caisse.py::test_transitions_interdites`. |
 
 ## V3 · Web Frontend Security
 
@@ -46,7 +46,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V4.1.1 | Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response, including the … | prévu | J7 | Content-Type JSON avec charset fixé par l'API pour toutes les routes (fait, J2-J3, testé) ; flux SSE en text/event-stream à vérifier à J7. |
+| V4.1.1 | Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response, including the … | fait | J7 | Toutes les réponses de l'API sont du JSON avec charset fixé (Utf8JSONResponse) ; pas de flux SSE (suivi par interrogation périodique, ADR 0009). Preuve : `apps/api/tests/test_security.py::test_en_tetes_de_securite, apps/api/tests/test_caisse.py`. |
 | V4.4.1 | Verify that WebSocket over TLS (WSS) is used for all WebSocket connections. | N/A |  | Pas de WebSocket : le temps réel utilise Server-Sent Events en HTTPS. |
 
 ## V5 · File Handling

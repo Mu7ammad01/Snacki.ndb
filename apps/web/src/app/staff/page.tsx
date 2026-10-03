@@ -35,10 +35,10 @@ export default async function StaffHome() {
 
       <section className="staff-grid">
         {show.caisse && (
-          <div className="track">
-            <h2>Caisse</h2>
-            <p className="muted">Commandes du jour en direct, saisie au comptoir, encaissement. Arrive à J7.</p>
-          </div>
+          <a className="track staff-link" href="/caisse">
+            <h2>Caisse →</h2>
+            <p className="muted">Commandes du jour en direct, saisie au comptoir, encaissement.</p>
+          </a>
         )}
         {show.pilotage && (
           <div className="track">

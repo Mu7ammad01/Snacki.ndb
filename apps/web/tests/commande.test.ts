@@ -1,10 +1,11 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { Shop } from "./helpers";
 import { cartCount, estimateTotal, sanitizeCart, setQty, toItems } from "@/lib/cart";
 import { normalizePhone, oneLine, validateInfo } from "@/lib/validate";
-import { buildMessage, waLink } from "@/lib/whatsapp";
-import type { OrderCreated } from "@/lib/types";
+import { contactMessage, waLink } from "@/lib/whatsapp";
 
 const known = new Set(Shop.products.keys());
 
@@ -52,36 +53,23 @@ describe("saisie", () => {
   });
 });
 
-describe("message WhatsApp", () => {
-  const order: OrderCreated = {
-    number: "SNK-1001-007", status: "recue", fulfilment: "livraison", total_mru: 320, currency: "MRU",
-    lines: [
-      { product_id: "salade", quantity: 2, unit_price_mru: 100, line_total_mru: 200 },
-      { product_id: "crepe", quantity: 1, unit_price_mru: 120, line_total_mru: 120 },
-    ],
-    created_at: "2026-10-01T12:00:00Z", tracking_token: "faux-jeton-de-test-0001", tracking_expires_at: "2026-10-02T12:00:00Z", // gitleaks:allow (faux jeton de test)
-  };
-  const base = { lang: "fr" as const, order, products: Shop.products, name: "Aïcha", phone: "22123456", zone: "cansado", landmark: "Près de la mosquée", pay: "bankily", note: "" };
-
-  it("reprend le numéro et le total calculés par l'API", () => {
-    const text = buildMessage(base);
-    expect(text).toContain("N° : SNK-1001-007");
-    expect(text).toContain("*Total : 320 MRU* + livraison à confirmer");
-    expect(text).toContain("2 × Salade de fruits — 200");
-    expect(text).toContain("Livraison — Cansado");
+describe("WhatsApp : simple lien de contact (J7)", () => {
+  it("le message prérempli contient seulement le numéro de commande", () => {
+    expect(contactMessage("fr", "SNK-1001-007")).toBe("Bonjour Snacki, à propos de ma commande SNK-1001-007 :");
+    expect(contactMessage("ar", "SNK-1001-007")).toContain("SNK-1001-007");
   });
 
-  it("une saisie ne peut pas fabriquer une fausse ligne de total", () => {
-    const text = buildMessage({ ...base, name: "Ali\n*Total : 1 MRU*" });
-    expect(text.split("\n").filter((l) => l.startsWith("*Total"))).toHaveLength(1);
-  });
-
-  it("ne contient jamais le jeton de suivi", () => {
-    expect(buildMessage(base)).not.toContain(order.tracking_token);
+  it("un numéro mal formé n'est jamais recopié", () => {
+    expect(contactMessage("fr", "SNK-1\n*Total : 1 MRU*")).not.toContain("Total");
   });
 
   it("le lien wa.me encode tout le texte", () => {
     const link = waLink("a & b\n#c");
     expect(link).toBe("https://wa.me/22237939409?text=a%20%26%20b%0A%23c");
+  });
+
+  it("la commande n'est plus envoyée par WhatsApp", () => {
+    const shop = readFileSync("src/components/Shop.tsx", "utf8");
+    expect(shop).not.toMatch(/buildMessage|sendWa/);
   });
 });

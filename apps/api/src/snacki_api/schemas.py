@@ -16,7 +16,15 @@ from pydantic import (
     model_validator,
 )
 
-from snacki_api.models import Badge, Category, Fulfilment, OrderStatus, StaffRole
+from snacki_api.models import (
+    Badge,
+    Category,
+    Fulfilment,
+    OrderSource,
+    OrderStatus,
+    PaymentMethod,
+    StaffRole,
+)
 
 
 class ProductOut(BaseModel):
@@ -54,6 +62,12 @@ Landmark = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=3, max_length=120, pattern=_NO_CONTROL)
 ]
 ProductRef = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z-]{0,39}$")]
+Note = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200, pattern=_NO_CONTROL)
+]
+Reason = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=3, max_length=160, pattern=_NO_CONTROL)
+]
 
 
 class OrderItemIn(BaseModel):
@@ -73,6 +87,10 @@ class OrderIn(BaseModel):
     fulfilment: Fulfilment
     landmark: Landmark | None = None
     items: list[OrderItemIn] = Field(min_length=1, max_length=10)
+    # J7 : la commande passe uniquement par l'app ; ces informations allaient dans le message
+    # WhatsApp. Le moyen de paiement est une préférence, l'encaissement réel est fait en caisse.
+    note: Note | None = None
+    pay_pref: PaymentMethod | None = None
 
     @field_validator("phone")
     @classmethod
@@ -112,10 +130,14 @@ class OrderTrackOut(BaseModel):
     number: str
     status: OrderStatus
     fulfilment: Fulfilment
-    total_mru: int
+    total_mru: int  # articles, prix figés
+    delivery_fee_mru: int = 0  # fixés par le staff à l'acceptation
+    grand_total_mru: int  # à payer
     currency: str = "MRU"
     lines: list[OrderLineOut]
     created_at: datetime
+    ready_at: datetime | None = None  # heure de mise à disposition annoncée
+    closed_reason: str | None = None  # motif d'un refus ou d'une annulation
 
 
 class OrderCreatedOut(OrderTrackOut):
@@ -187,4 +209,71 @@ class StaffUpdateIn(BaseModel):
     def _au_moins_un(self) -> "StaffUpdateIn":
         if self.role is None and self.active is None:
             raise ValueError("Indiquez un rôle ou un état")
+        return self
+
+
+# --- Caisse (J7) ------------------------------------------------------------------------------
+
+
+class CaisseOrderOut(OrderTrackOut):
+    """Vue du staff : coordonnées du client comprises (réservée aux comptes connectés)."""
+
+    id: int
+    source: OrderSource
+    customer_name: str
+    phone: str | None
+    landmark: str | None
+    note: str | None
+    pay_pref: PaymentMethod | None
+    accepted_at: datetime | None
+    customer_called_at: datetime | None
+    paid_method: PaymentMethod | None
+    paid_at: datetime | None
+
+
+class CaisseDayOut(BaseModel):
+    server_time: datetime
+    orders: list[CaisseOrderOut]
+
+
+class AcceptIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ready_in_min: int = Field(ge=5, le=120)
+    delivery_fee_mru: int | None = Field(default=None, ge=0, le=2000)
+
+
+class AdvanceIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: OrderStatus
+
+
+class ReasonIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Reason
+
+
+class PayIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    method: PaymentMethod
+
+
+class CounterOrderIn(BaseModel):
+    """Vente au comptoir : produits et quantités, comme le client ; jamais de prix."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[OrderItemIn] = Field(min_length=1, max_length=10)
+    customer_name: Name | None = None
+    note: Note | None = None
+    paid_method: PaymentMethod | None = None
+
+    @model_validator(mode="after")
+    def _unique(self) -> "CounterOrderIn":
+        ids = [item.product_id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("un produit ne doit apparaître qu'une fois (regrouper les quantités)")
         return self
