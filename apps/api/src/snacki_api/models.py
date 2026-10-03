@@ -170,7 +170,9 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
     action: Mapped[str] = mapped_column(String(40))
     target: Mapped[str | None] = mapped_column(String(120))
