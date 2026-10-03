@@ -3,7 +3,6 @@ import type { Lang } from "./types";
 export const CONTACT = {
   whatsapp: "22237939409", // +222 37 93 94 09
   whatsappDisplay: "37 93 94 09",
-  call: "41 44 55 74",
 };
 
 export const ZONES = [
@@ -28,7 +27,7 @@ const fr = {
   top: "N°1 des ventes", pop: "Populaire",
   add: "Ajouter", less: "Retirer un", more: "Ajouter un",
   seeCart: "Voir mon panier",
-  waLabel: "WhatsApp", callLabel: "Appel", cash: "Espèces",
+  waLabel: "WhatsApp", cash: "Espèces",
   cartTitle: "Mon panier", infoTitle: "Vos informations", doneTitle: "Commande enregistrée",
   emptyCart: "Votre panier est vide.",
   estimate: "Total estimé",
@@ -73,7 +72,7 @@ const ar: Dict = {
   top: "الأكثر طلبًا", pop: "مطلوب",
   add: "أضف", less: "أنقص واحدًا", more: "زد واحدًا",
   seeCart: "عرض السلة",
-  waLabel: "واتساب", callLabel: "اتصال", cash: "نقدًا",
+  waLabel: "واتساب", cash: "نقدًا",
   cartTitle: "سلتي", infoTitle: "معلوماتك", doneTitle: "تم تسجيل الطلب",
   emptyCart: "سلتك فارغة.",
   estimate: "المجموع التقديري",

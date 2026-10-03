@@ -73,3 +73,10 @@ describe("WhatsApp : simple lien de contact (J7)", () => {
     expect(shop).not.toMatch(/buildMessage|sendWa/);
   });
 });
+
+describe("contacts affichés", () => {
+  it("seul WhatsApp est proposé, plus de numéro d'appel", () => {
+    const shop = readFileSync("src/components/Shop.tsx", "utf8");
+    expect(shop).not.toMatch(/CONTACT\.call|callLabel/);
+  });
+});
