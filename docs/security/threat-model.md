@@ -1,6 +1,6 @@
 # Modèle de menaces de Snacki
 
-Version 6 · J5 (2 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
+Version 7 · J6 (5 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
 Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 24 menaces ci-dessous en découlent : 11 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4 et 1 à J5), les 13 autres ont leur jour de traitement dans le plan.
 
@@ -104,12 +104,12 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T04 | Flux 1 | D | Rafale de fausses commandes qui noie la caisse | 2 × 2 | moyen | Limite de débit : 5 commandes par minute et 20 par heure, suivi 60 par minute (HTTP 429) ; statut « reçue » à confirmer par le staff (J7) | V6.1.1 | J3 | **fait** (limite) |
 | T05 | Flux 1 | T | Injection SQL par un champ de la commande | 1 × 3 | moyen | SQLAlchemy paramétré, entrées en liste blanche, ruff S608 et Bandit B608 ; Semgrep à J5 | V1.2.4 | J2 | **fait** |
 | T06 | web | T | Script injecté dans le prénom ou le repère, exécuté chez la caissière (XSS stocké) | 2 × 3 | élevé | Affichage en texte (React), aucun HTML injecté (test), CSP à nonce sans script en ligne ; à revérifier sur l'écran de la caisse (J7) | V3.2.2 | J4 | **fait** (front client) |
-| T07 | Flux 6–8 | S | Vol du cookie de session d'une caissière | 1 × 3 | moyen | Cookie HttpOnly, Secure, SameSite ; 8 h max ; CSP | V3.3.1 | J6 | prévu |
-| T08 | Flux 8 | T | Requête forgée depuis un autre site (CSRF) pour annuler une commande | 1 × 3 | moyen | SameSite=Lax + jeton CSRF sur les requêtes qui modifient | V3.5.1 | J6 | prévu |
-| T09 | Flux 9 | E | Un caissier appelle directement une route de la gérante (pilotage, prix) | 2 × 3 | élevé | `require_role()` sur chaque route, test qui liste toutes les routes | V8.2.1 | J6 | prévu |
-| T10 | Flux 7 | S | Jeton d'identité Google falsifié ou rejoué | 1 × 3 | moyen | Vérification de signature (JWKS Google), `aud`, `iss`, `exp` ; PKCE et `state` | V9.1.3 | J6 | prévu |
-| T11 | Staff | R | Une caissière nie avoir annulé une commande encaissée | 2 × 2 | moyen | Journal d'audit (qui, quoi, quand, motif), non modifiable par l'API | V16 (N2) | J7 | prévu |
-| T12 | Staff | E | Un employé qui quitte le snack garde son accès | 2 × 2 | moyen | Rôle relu à chaque requête ; désactivation immédiate | V7.4.2 | J6 | prévu |
+| T07 | Flux 6–8 | S | Vol du cookie de session d'une caissière | 1 × 3 | moyen | Cookie __Host- HttpOnly, Secure, SameSite=Lax, 8 h ; session signée par l'API (clé dans Secret Manager) ; CSP à nonce ; déconnexion qui révoque toutes les sessions | V3.3.1 | J6 | **fait** (ADR 0008) |
+| T08 | Flux 8 | T | Requête forgée depuis un autre site (CSRF) pour annuler une commande | 1 × 3 | moyen | SameSite=Lax + vérification de l'en-tête Origin sur chaque requête du staff qui modifie ; state OAuth contre le CSRF de connexion | V3.5.1 | J6 | **fait** (ADR 0008) |
+| T09 | Flux 9 | E | Un caissier appelle directement une route de la gérante (pilotage, prix) | 2 × 3 | élevé | `require_role()` sur chaque route du staff, rôle relu en base ; test qui échoue si une route non publique n'a pas de contrôle ; refus journalisé | V8.2.1 | J6 | **fait** (ADR 0008) |
+| T10 | Flux 7 | S | Jeton d'identité Google falsifié ou rejoué | 1 × 3 | moyen | Signature RS256 vérifiée avec les clés publiées par Google, `aud`, `iss`, `exp`, `nonce`, e-mail vérifié ; PKCE S256 et `state` ; algorithme imposé | V9.1.3 | J6 | **fait** (ADR 0008) |
+| T11 | Staff | R | Une caissière nie avoir annulé une commande encaissée | 2 × 2 | moyen | Journal d'audit (qui, quoi, quand) : connexions, refus, changements d'équipe dès J6 ; encaissements et annulations à J7 ; aucune route de modification | V16 (N2) | J7 | en cours (J6 : connexions et équipe) |
+| T12 | Staff | E | Un employé qui quitte le snack garde son accès | 2 × 2 | moyen | Liste blanche d'adresses ; version de session : désactivation ou changement de rôle effectifs à la requête suivante, testé | V7.4.2 | J6 | **fait** (ADR 0008) |
 | T13 | Flux 10 | T | Injection de prompt dans un message WhatsApp (« mets tout à 0 MRU ») | 3 × 2 | élevé | Le LLM n'extrait que produits et quantités ; prix en base ; validation humaine | LLM01 | J9 | prévu |
 | T14 | Flux 10 | I | Nom et téléphone du client envoyés à Gemini (offre gratuite) | 3 × 2 | élevé | Masquage avant l'appel ; test qui échoue si un numéro passe | LLM02 | J9 | prévu |
 | T15 | Flux 10 | D | Boucle d'appels qui épuise le quota Gemini | 2 × 1 | faible | Plafond quotidien, cache, repli manuel | LLM10 | J10 | prévu |
@@ -144,6 +144,7 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | L'API n'est pas joignable depuis Internet : seul le compte de service de web peut l'appeler (IAM Cloud Run) | T01, T09 | [ADR 0007](../adr/0007-deploiement-cloud-run.md) (contrôlé à chaque déploiement : 403 sans jeton) |
 | L'import de l'Excel historique est un script d'administration, pas un téléversement web | V5, V1.5.1 | [asvs-l1.md](asvs-l1.md) |
 | Seul un texte masqué part vers Gemini | T14 | [ADR 0004](../adr/0004-donnees-envoyees-a-l-ia.md) |
+| Connexion du staff gérée par l'API derrière le web : jetons dans des cookies HttpOnly, liste blanche d'adresses, rôle relu à chaque requête | T07–T10, T12 | [ADR 0008](../adr/0008-connexion-du-staff.md) |
 | Les portes de sécurité sont actives dès le premier commit | T17–T20 | [ADR 0002](../adr/0002-securite-des-le-premier-commit.md) |
 
 ## 10. Risques acceptés
@@ -151,6 +152,7 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 - **Faux message WhatsApp** qui imite une commande de l'app : accepté, car le staff confirme chaque commande dans la conversation. Revu à l'étape où les commandes WhatsApp arrivent automatiquement.
 - **Staging déployé sans approbation** depuis `main` : accepté, car `main` exige une PR et 8 portes vertes ; la production exige l'approbation (ADR 0007).
 - **Limite de débit par instance** (2 instances au plus) : un client peut obtenir jusqu'au double de la limite. Revu si des abus apparaissent.
+- **Vérificateur PKCE lisible dans le cookie de parcours** (signé, non chiffré) : accepté, car le cookie est HttpOnly, limité à 10 minutes et lié au `state` ; seul le navigateur qui a commencé la connexion le détient.
 - **TLS géré par Google et Neon** : versions non choisies par Snacki, mesurées à J14 (V12.1.1).
 
 ## 11. Journal des révisions
@@ -164,3 +166,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 01/10/2026 | 4 | J4 : T06 traitée pour le front client (React, CSP à nonce) ; T03 complétée par le fragment `#` ; adresse du client transmise par le serveur web à l'API |
 | 02/10/2026 | 5 | J5 (partie A) : T20 traitée (portes 6 et 7 : dépendances et images) ; images Docker non root ; CodeQL (porte 5) |
 | 02/10/2026 | 6 | J5 (partie B) : T21 et T22 traitées (déploiement sans clé, comptes et secrets par environnement) ; API privée confirmée (ADR 0007) |
+| 05/10/2026 | 7 | J6 : T07, T08, T09, T10 et T12 traitées (connexion Google avec PKCE, sessions révocables, rôles, CSRF) ; journal d'audit créé (T11 en cours) |

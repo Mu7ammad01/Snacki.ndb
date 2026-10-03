@@ -71,7 +71,7 @@ Chaque fusion sur `main` déclenche `.github/workflows/deploy.yml` après une CI
 | `snacki-web-staging`, `snacki-web-prod` | public (HTTPS) |
 | `snacki-api-staging`, `snacki-api-prod` | privé : seul le serveur web du même environnement peut l'appeler |
 
-Mise en place, une seule fois : `./infra/gcp/setup-deploy.sh <projet> <propriétaire/dépôt>`.
+Mise en place, une seule fois : `./infra/gcp/setup-deploy.sh <projet> <propriétaire/dépôt>`, puis `./infra/gcp/setup-auth.sh` pour la connexion du staff ([ADR 0008](docs/adr/0008-connexion-du-staff.md)).
 
 ## Organisation du dépôt
 

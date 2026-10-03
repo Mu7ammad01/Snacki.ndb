@@ -12,7 +12,8 @@ RUN python -m venv /venv \
 
 # --- Étape 2 : image finale, sans outils de construction ---
 FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" SNACKI_ENVIRONMENT=prod
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" PYTHONPATH=/app/src \
+    SNACKI_ENVIRONMENT=prod
 # Utilisateur sans droits : une faille dans l'API ne donne pas la main sur le conteneur.
 # pip est retiré : inutile pour faire tourner l'API, c'est un outil de moins pour un attaquant.
 # Correctifs de sécurité Debian publiés après l'image de base (porte 7, Trivy).

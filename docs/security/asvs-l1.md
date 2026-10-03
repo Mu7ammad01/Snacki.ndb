@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 24 fait · 23 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 42 fait · 5 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -35,10 +35,10 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | --- | --- | --- | --- | --- |
 | V3.2.1 | Verify that security controls are in place to prevent browsers from rendering content or functionality in HTTP responses in an incorrect context (e.g., when … | fait | J5 | En-têtes nosniff, Content-Type exact et CSP sur toutes les réponses du web et de l'API ; vérifiés par les tests et par le contrôle de fumée de chaque déploiement. Preuve : `apps/api/tests/test_security.py, apps/web/tests/securite.test.ts, infra/gcp/deploy.sh`. |
 | V3.2.2 | Verify that content intended to be displayed as text, rather than rendered as HTML, is handled using safe rendering functions (such as createTextNode or … | fait | J4 | Textes saisis (prénom, repère, remarque) affichés comme texte par React et ramenés sur une seule ligne dans le message WhatsApp (oneLine) ; aucune insertion HTML. Preuve : `apps/web/src/lib/validate.ts, apps/web/tests/commande.test.ts`. |
-| V3.3.1 | Verify that cookies have the 'Secure' attribute set, and if the '\__Host-' prefix is not used for the cookie name, the '__Secure-' prefix must be used for the … | prévu | J6 | Cookie de session __Host-snacki_session avec Secure, HttpOnly, SameSite=Lax, Path=/. |
+| V3.3.1 | Verify that cookies have the 'Secure' attribute set, and if the '\__Host-' prefix is not used for the cookie name, the '__Secure-' prefix must be used for the … | fait | J6 | Cookie de session __Host-snacki_session : Secure, HttpOnly, SameSite=Lax, Path=/, 8 h ; cookie de parcours OAuth de 10 min sur le même modèle. Preuve : `apps/web/src/lib/staff.ts, apps/web/tests/staff.test.ts`. |
 | V3.4.1 | Verify that a Strict-Transport-Security header field is included on all responses to enforce an HTTP Strict Transport Security (HSTS) policy. A maximum age of … | fait | J5 | Strict-Transport-Security: max-age=31536000; includeSubDomains sur le web et l'API ; présence vérifiée à chaque déploiement. Preuve : `apps/web/next.config.ts, apps/api/src/snacki_api/main.py, infra/gcp/deploy.sh`. |
 | V3.4.2 | Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header field is a fixed value by the application, or if the Origin HTTP … | fait | J5 | API privée (IAM Cloud Run, 403 sans jeton), appelée seulement par le serveur web : aucun en-tête CORS servi. Preuve : `infra/gcp/setup-deploy.sh, infra/gcp/deploy.sh, docs/adr/0007-deploiement-cloud-run.md`. |
-| V3.5.1 | Verify that, if the application does not rely on the CORS preflight mechanism to prevent disallowed cross-origin requests to use sensitive functionality, … | prévu | J6 | Protection CSRF : SameSite=Lax + jeton CSRF (double soumission) sur les requêtes du staff qui modifient. |
+| V3.5.1 | Verify that, if the application does not rely on the CORS preflight mechanism to prevent disallowed cross-origin requests to use sensitive functionality, … | fait | J6 | Protection CSRF : SameSite=Lax + vérification de l'en-tête Origin (adresse publique configurée, jamais Host) sur chaque requête du staff qui modifie ; state OAuth contre le CSRF de connexion. Preuve : `apps/web/src/lib/staff.ts, apps/web/src/app/api/staff, apps/api/tests/test_staff.py`. |
 | V3.5.2 | Verify that, if the application relies on the CORS preflight mechanism to prevent disallowed cross-origin use of sensitive functionality, it is not possible … | N/A |  | Snacki ne s'appuie pas sur le preflight CORS pour se protéger (voir V3.5.1). |
 | V3.5.3 | Verify that HTTP requests to sensitive functionality use appropriate HTTP methods such as POST, PUT, PATCH, or DELETE, and not methods defined by the HTTP … | fait | J3 | Création en POST uniquement ; le suivi en GET est sans effet de bord, vérifié par test. Preuve : `apps/api/tests/test_orders.py : test_suivi_sans_effet_de_bord`. |
 
@@ -71,8 +71,8 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | V6.2.6 | Verify that password input fields use type=password to mask the entry. Applications may allow the user to temporarily view the entire masked password, or the … | N/A |  | Aucun mot de passe géré par Snacki. |
 | V6.2.7 | Verify that "paste" functionality, browser password helpers, and external password managers are permitted. | N/A |  | Aucun mot de passe géré par Snacki. |
 | V6.2.8 | Verify that the application verifies the user's password exactly as received from the user, without any modifications such as truncation or case transformation. | N/A |  | Aucun mot de passe géré par Snacki. |
-| V6.3.1 | Verify that controls to prevent attacks such as credential stuffing and password brute force are implemented according to the application's security … | prévu | J6 | Attaques sur les identifiants portées par Google ; limite de débit sur /auth/* ; seuls les e-mails de la liste du staff sont acceptés. |
-| V6.3.2 | Verify that default user accounts (e.g., "root", "admin", or "sa") are not present in the application or are disabled. | prévu | J6 | Aucun compte par défaut : la liste du staff part vide et le premier admin est créé par une migration à partir d'un e-mail en variable d'environnement. |
+| V6.3.1 | Verify that controls to prevent attacks such as credential stuffing and password brute force are implemented according to the application's security … | fait | J6 | Mots de passe gérés par Google ; limite de débit sur /v1/auth/* (10/min, 30/h) ; seules les adresses de la table staff_user sont acceptées. Preuve : `apps/api/src/snacki_api/ratelimit.py, apps/api/tests/test_staff.py`. |
+| V6.3.2 | Verify that default user accounts (e.g., "root", "admin", or "sa") are not present in the application or are disabled. | fait | J6 | Aucun compte par défaut : la table du staff part vide ; le premier admin est créé par le job de migration à partir de SNACKI_BOOTSTRAP_ADMIN_EMAIL, une seule fois. Preuve : `apps/api/src/snacki_api/manage.py, apps/api/src/snacki_api/staff.py`. |
 | V6.4.1 | Verify that system generated initial passwords or activation codes are securely randomly generated, follow the existing password policy, and expire after a … | N/A |  | Aucun mot de passe initial ni code d'activation générés. |
 | V6.4.2 | Verify that password hints or knowledge-based authentication (so-called "secret questions") are not present. | N/A |  | Aucune question secrète ni indice de mot de passe. |
 
@@ -80,30 +80,30 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V7.2.1 | Verify that the application performs all session token verification using a trusted, backend service. | prévu | J6 | Le JWT est vérifié uniquement par l'API, jamais par le front. |
-| V7.2.2 | Verify that the application uses either self-contained or reference tokens that are dynamically generated for session management, i.e. not using static API … | prévu | J6 | Jetons de session générés à chaque connexion, signés avec une clé stockée dans Secret Manager ; aucune clé d'API statique pour le staff. |
-| V7.2.3 | Verify that if reference tokens are used to represent user sessions, they are unique and generated using a cryptographically secure pseudo-random number … | prévu | J6 | Jeton de suivi client tiré avec secrets.token_urlsafe (128 bits) : fait à J3 (apps/api/src/snacki_api/orders.py). Identifiant de jeton (jti) de session staff : J6. |
-| V7.2.4 | Verify that the application generates a new session token on user authentication, including re-authentication, and terminates the current session token. | prévu | J6 | Nouveau jeton à chaque connexion ; l'ancien cookie est remplacé et son jti révoqué. |
-| V7.4.1 | Verify that when session termination is triggered (such as logout or expiration), the application disallows any further use of the session. For reference … | prévu | J6 | Déconnexion : jti ajouté à une liste de révocation en base, vérifiée à chaque requête ; durée de vie maximale 8 h. |
-| V7.4.2 | Verify that the application terminates all active sessions when a user account is disabled or deleted (such as an employee leaving the company). | prévu | J6 | Le rôle est relu en base à chaque requête : désactiver un membre du staff coupe immédiatement toutes ses sessions. |
+| V7.2.1 | Verify that the application performs all session token verification using a trusted, backend service. | fait | J6 | La session est vérifiée uniquement par l'API (signature, audience, expiration, version), jamais par le web. Preuve : `apps/api/src/snacki_api/main.py (require_role)`. |
+| V7.2.2 | Verify that the application uses either self-contained or reference tokens that are dynamically generated for session management, i.e. not using static API … | fait | J6 | Jeton de session signé par l'API à chaque connexion, clé de 48 octets aléatoires dans Secret Manager ; aucune clé d'API statique pour le staff. Preuve : `apps/api/src/snacki_api/auth.py, infra/gcp/setup-auth.sh`. |
+| V7.2.3 | Verify that if reference tokens are used to represent user sessions, they are unique and generated using a cryptographically secure pseudo-random number … | fait | J6 | Jeton de suivi : secrets.token_urlsafe (128 bits) ; state, nonce et vérificateur PKCE : secrets (192 à 256 bits). Preuve : `apps/api/src/snacki_api/orders.py, apps/api/src/snacki_api/auth.py`. |
+| V7.2.4 | Verify that the application generates a new session token on user authentication, including re-authentication, and terminates the current session token. | fait | J6 | Nouveau jeton de session à chaque connexion ; la déconnexion, un changement de rôle ou une désactivation révoquent toutes les sessions du compte (version de session). Preuve : `apps/api/src/snacki_api/staff.py, apps/api/tests/test_staff.py`. |
+| V7.4.1 | Verify that when session termination is triggered (such as logout or expiration), the application disallows any further use of the session. For reference … | fait | J6 | Déconnexion : la version de session du compte augmente, l'API refuse aussitôt les anciens jetons ; durée de vie maximale 8 h. Preuve : `apps/api/tests/test_staff.py (test_deconnexion_invalide_la_session)`. |
+| V7.4.2 | Verify that the application terminates all active sessions when a user account is disabled or deleted (such as an employee leaving the company). | fait | J6 | Le compte et son rôle sont relus en base à chaque requête : désactivation ou changement de rôle effectifs immédiatement. Preuve : `apps/api/tests/test_staff.py (test_desactivation_immediate)`. |
 
 ## V8 · Authorization
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V8.1.1 | Verify that authorization documentation defines rules for restricting function-level and data-specific access based on consumer permissions and resource … | fait | J1 | Matrice des droits par rôle et règles d'accès aux données documentées (section 5 du modèle de menaces). Preuve : `docs/security/threat-model.md#5`. |
-| V8.2.1 | Verify that the application ensures that function-level access is restricted to consumers with explicit permissions. | prévu | J6 | Dépendance FastAPI require_role() sur chaque route du staff ; test qui échoue si une route n'en a pas. |
+| V8.2.1 | Verify that the application ensures that function-level access is restricted to consumers with explicit permissions. | fait | J6 | Dépendance require_role() sur chaque route du staff ; un test échoue si une route non publique n'en a pas. Preuve : `apps/api/tests/test_staff.py (test_chaque_route_non_publique_exige_un_role)`. |
 | V8.2.2 | Verify that the application ensures that data-specific access is restricted to consumers with explicit permissions to specific data items to mitigate insecure … | fait | J3 | Commande lisible seulement avec son jeton de suivi (128 bits, stocké haché, 24 h) ; même réponse 404 pour un jeton inconnu, expiré ou mal formé ; tests d'accès croisé. Preuve : `apps/api/tests/test_orders.py : test_un_jeton_n_ouvre_que_sa_commande, test_jeton_invalide_meme_reponse, test_jeton_expire`. |
-| V8.3.1 | Verify that the application enforces authorization rules at a trusted service layer and doesn't rely on controls that an untrusted consumer could manipulate, … | prévu | J6 | Tous les contrôles d'accès dans l'API ; le front ne fait que masquer des boutons. |
+| V8.3.1 | Verify that the application enforces authorization rules at a trusted service layer and doesn't rely on controls that an untrusted consumer could manipulate, … | fait | J6 | Tous les contrôles d'accès dans l'API ; le web ne fait que masquer des sections. Preuve : `apps/api/src/snacki_api/main.py, apps/web/src/lib/staff.ts (sectionsFor)`. |
 
 ## V9 · Self-contained Tokens
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V9.1.1 | Verify that self-contained tokens are validated using their digital signature or MAC to protect against tampering before accepting the token's contents. | prévu | J6 | JWT vérifiés par signature (bibliothèque PyJWT) avant toute lecture du contenu. |
-| V9.1.2 | Verify that only algorithms on an allowlist can be used to create and verify self-contained tokens, for a given context. The allowlist must include the … | prévu | J6 | Algorithme imposé : algorithms=["HS256"] ; 'none' refusé ; test dédié. |
-| V9.1.3 | Verify that key material that is used to validate self-contained tokens is from trusted pre-configured sources for the token issuer, preventing attackers from … | prévu | J6 | Clé de signature lue uniquement dans Secret Manager ; jetons d'identité Google vérifiés avec les clés publiées par Google (JWKS). |
-| V9.2.1 | Verify that, if a validity time span is present in the token data, the token and its content are accepted only if the verification time is within this … | prévu | J6 | exp et nbf vérifiés, tolérance d'horloge de 30 s. |
+| V9.1.1 | Verify that self-contained tokens are validated using their digital signature or MAC to protect against tampering before accepting the token's contents. | fait | J6 | Jetons vérifiés par signature (PyJWT) avant toute lecture du contenu : sessions, parcours OAuth, jetons d'identité Google. Preuve : `apps/api/src/snacki_api/auth.py`. |
+| V9.1.2 | Verify that only algorithms on an allowlist can be used to create and verify self-contained tokens, for a given context. The allowlist must include the … | fait | J6 | Algorithmes imposés : HS256 pour les jetons de l'API, RS256 pour Google ; « none » et la confusion HS256/RS256 refusés, testés. Preuve : `apps/api/tests/test_staff.py`. |
+| V9.1.3 | Verify that key material that is used to validate self-contained tokens is from trusted pre-configured sources for the token issuer, preventing attackers from … | fait | J6 | Clé de session lue dans Secret Manager ; jetons d'identité Google vérifiés avec les clés publiées par Google (JWKS), audience et émetteur contrôlés. Preuve : `apps/api/src/snacki_api/auth.py`. |
+| V9.2.1 | Verify that, if a validity time span is present in the token data, the token and its content are accepted only if the verification time is within this … | fait | J6 | exp vérifié (et iat exigé pour Google), tolérance d'horloge de 30 s sur les jetons Google ; sessions et parcours expirés refusés, testés. Preuve : `apps/api/tests/test_staff.py`. |
 
 ## V10 · OAuth and OIDC
 
@@ -119,9 +119,9 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V11.3.1 | Verify that insecure block modes (e.g., ECB) and weak padding schemes (e.g., PKCS#1 v1.5) are not used. | prévu | J6 | Aucun chiffrement maison : TLS et bibliothèques reconnues uniquement ; règle Semgrep sur les modes ECB. |
+| V11.3.1 | Verify that insecure block modes (e.g., ECB) and weak padding schemes (e.g., PKCS#1 v1.5) are not used. | prévu | J12 | Aucun chiffrement maison : TLS et bibliothèques reconnues uniquement ; règle Semgrep sur les modes ECB. |
 | V11.3.2 | Verify that only approved ciphers and modes such as AES with GCM are used. | prévu | J14 | Export de sauvegarde chiffré en AES-GCM (bibliothèque cryptography). |
-| V11.4.1 | Verify that only approved hash functions are used for general cryptographic use cases, including digital signatures, HMAC, KDF, and random bit generation. … | prévu | J6 | SHA-256 / HMAC-SHA-256 uniquement ; Bandit B303/B324 contre MD5 et SHA-1. |
+| V11.4.1 | Verify that only approved hash functions are used for general cryptographic use cases, including digital signatures, HMAC, KDF, and random bit generation. … | fait | J6 | SHA-256 et HMAC-SHA-256 uniquement (jeton de suivi, PKCE S256, signatures HS256) ; Bandit (B303, B324) dans pre-commit et la CI. Preuve : `apps/api/src/snacki_api/auth.py, .pre-commit-config.yaml`. |
 
 ## V12 · Secure Communication
 
@@ -142,7 +142,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V14.2.1 | Verify that sensitive data is only sent to the server in the HTTP message body or header fields, and that the URL and query string do not contain sensitive … | fait | J4 | API : jeton reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL. Front : lien /suivi#jeton, le fragment n'est jamais envoyé au serveur ; la page le lit et l'envoie en en-tête. Aucune donnée personnelle dans les URL. Preuve : `apps/api/tests/test_orders.py::test_jeton_refuse_dans_l_url, apps/web/src/lib/token.ts, apps/web/tests/securite.test.ts`. |
-| V14.3.1 | Verify that authenticated data is cleared from client storage, such as the browser DOM, after the client or session is terminated. The 'Clear-Site-Data' HTTP … | prévu | J6 | Déconnexion : en-tête Clear-Site-Data "cache", "storage" et suppression du cookie. |
+| V14.3.1 | Verify that authenticated data is cleared from client storage, such as the browser DOM, after the client or session is terminated. The 'Clear-Site-Data' HTTP … | fait | J6 | Déconnexion : cookie supprimé et en-tête Clear-Site-Data "cache", "storage". Preuve : `apps/web/src/app/auth/logout/route.ts`. |
 
 ## V15 · Secure Coding and Architecture
 
