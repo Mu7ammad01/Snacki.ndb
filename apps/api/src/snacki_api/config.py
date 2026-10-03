@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     session_hours: int = Field(default=8, ge=1, le=12)
     # Premier compte administrateur, créé par la migration s'il n'existe encore aucun admin.
     bootstrap_admin_email: str = ""
+    # J8 : coordonnées des clients effacées après ce délai (inventaire des données).
+    retention_days: int = Field(default=90, ge=30, le=730)
 
     @field_validator("database_url")
     @classmethod

@@ -40,9 +40,25 @@ Toutes les valeurs viennent de variables d'environnement préfixées `SNACKI_` (
 | --- | --- | --- |
 | `SNACKI_DATABASE_URL` | oui | Pas de valeur par défaut : sans elle, l'API refuse de démarrer. En `staging` et `prod`, `sslmode=require` est exigé. |
 | `SNACKI_ENVIRONMENT` | non | `dev` (défaut), `test`, `staging`, `prod`. En `staging`/`prod`, `/docs` est désactivé. |
+| `SNACKI_RETENTION_DAYS` | non | Délai avant anonymisation des coordonnées des clients : 90 jours par défaut (30 à 730). |
 | `SNACKI_CORS_ORIGINS` | non | Liste JSON d'origines fixes ; en production, HTTPS uniquement. Vide par défaut : l'API est appelée par le serveur web, pas par le navigateur (ADR 0001). |
 
 En staging et en production, ces valeurs viendront de Secret Manager (J5), jamais d'un fichier.
+
+## Importer l'historique Excel (J8, ADR 0010)
+
+Script d'administration, lancé depuis `apps/api` dans le Codespace. Le classeur reste hors du dépôt (`.gitignore`).
+
+```bash
+pip install -r requirements-dev.txt                 # pandas, openpyxl, defusedxml
+# 1. essai à blanc sur la base locale : rapport, rien n'est écrit
+PYTHONPATH=src python -m snacki_api.manage import-history ~/suivi.xlsx --dry-run
+# 2. import réel en staging : l'URL de la base vient de Secret Manager, sans être affichée
+SNACKI_DATABASE_URL="$(gcloud secrets versions access latest --secret=snacki-db-url-staging)" \
+  PYTHONPATH=src python -m snacki_api.manage import-history ~/suivi.xlsx
+```
+
+Relancer le même fichier ne double rien : les jours qu'il contient sont remplacés.
 
 ## Organisation
 
@@ -50,12 +66,17 @@ En staging et en production, ces valeurs viendront de Secret Manager (J5), jamai
 src/snacki_api/
   config.py      configuration (pydantic-settings, secrets en SecretStr)
   db.py          connexion SQLAlchemy (pool vérifié, délai maximal de requête 10 s)
-  models.py      tables (product, orders, order_line)
+  models.py      tables (produits, commandes, staff, journal, historique)
   schemas.py     formats de réponse (champs publics uniquement)
   repository.py  requêtes du menu (ORM, paramètres liés)
   orders.py      création de commande (prix lus en base) et suivi par jeton haché
   ratelimit.py   limite de débit en mémoire (fenêtre glissante)
+  caisse.py      cycle de commande, encaissement, comptoir (J7)
+  pilotage.py    chiffre d'affaires, top produits, paiements (J8)
+  history.py     lecture et import de l'historique Excel (J8)
+  retention.py   conservation : anonymisation à 90 jours, journal 1 an (J8)
+  manage.py      migrate, purge, import-history
   main.py        application, routes, en-têtes de sécurité, erreurs sans fuite
-migrations/      Alembic : 0001 table product, 0002 menu initial, 0003 commandes
-tests/           67 tests sur PostgreSQL : menu, commandes, jetons, limites, injections, configuration
+migrations/      Alembic : 0001 à 0007 (menu, commandes, staff, caisse, historique)
+tests/           tests sur PostgreSQL : menu, commandes, staff, caisse, pilotage, historique, sécurité
 ```

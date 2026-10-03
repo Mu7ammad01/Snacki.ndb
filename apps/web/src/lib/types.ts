@@ -70,3 +70,19 @@ export interface OrderRequest {
   note?: string;
   pay_pref?: PaymentMethod;
 }
+
+/** Pilotage (J8) : réponse de GET /v1/pilotage, gérante et admin seulement. */
+export interface Pilotage {
+  start: string;
+  end: string;
+  revenue_mru: number;
+  orders: number;
+  average_basket_mru: number;
+  today_mru: number;
+  all_time_mru: number;
+  by_day: { day: string; app_mru: number; comptoir_mru: number; historique_mru: number }[];
+  top: { product_id: string | null; label: string; quantity: number; revenue_mru: number }[];
+  payments: { method: PaymentMethod; count: number; amount_mru: number }[];
+  history_first: string | null;
+  history_last: string | null;
+}

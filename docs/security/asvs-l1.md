@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 44 fait · 3 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 45 fait · 2 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -18,7 +18,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | V1.2.5 | Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line … | fait | J1 | Aucun appel shell dans l'application ; ruff S602/S605 et Bandit B602/B605 bloquants en pre-commit et en CI. Preuve : `.pre-commit-config.yaml, pyproject.toml [tool.ruff.lint]`. |
 | V1.3.1 | Verify that all untrusted HTML input from WYSIWYG editors or similar is sanitized using a well-known and secure HTML sanitization library or framework feature. | N/A |  | Aucun éditeur de texte riche ni saisie HTML dans Snacki. |
 | V1.3.2 | Verify that the application avoids the use of eval() or other dynamic code execution features such as Spring Expression Language (SpEL). Where there is no … | fait | J1 | eval/exec interdits : ruff S307 et Bandit B307 bloquants ; ESLint no-eval côté front (J4). Preuve : `pyproject.toml [tool.ruff.lint] select S`. |
-| V1.5.1 | Verify that the application configures XML parsers to use a restrictive configuration and that unsafe features such as resolving external entities are … | prévu | J8 | Import de l'historique Excel (XML) : defusedxml installé pour openpyxl, import en script d'administration et non en téléversement web. |
+| V1.5.1 | Verify that the application configures XML parsers to use a restrictive configuration and that unsafe features such as resolving external entities are … | fait | J8 | Import de l'historique Excel : script d'administration (pas de téléversement web), .xlsx de 5 Mo au plus, feuille « Ventes » seule, defusedxml installé pour openpyxl (bombes XML, entités externes), valeurs lues sans exécuter de formule, textes nettoyés et bornés. Preuve : `apps/api/src/snacki_api/history.py, apps/api/tests/test_history.py`. |
 
 ## V2 · Validation and Business Logic
 
@@ -47,7 +47,7 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
 | V4.1.1 | Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response, including the … | fait | J7 | Toutes les réponses de l'API sont du JSON avec charset fixé (Utf8JSONResponse) ; pas de flux SSE (suivi par interrogation périodique, ADR 0009). Preuve : `apps/api/tests/test_security.py::test_en_tetes_de_securite, apps/api/tests/test_caisse.py`. |
-| V4.4.1 | Verify that WebSocket over TLS (WSS) is used for all WebSocket connections. | N/A |  | Pas de WebSocket : le temps réel utilise Server-Sent Events en HTTPS. |
+| V4.4.1 | Verify that WebSocket over TLS (WSS) is used for all WebSocket connections. | N/A |  | Pas de WebSocket ni de flux : la caisse et le suivi interrogent l'API à intervalle régulier en HTTPS (ADR 0009). |
 
 ## V5 · File Handling
 

@@ -41,3 +41,7 @@ Thumbs.db
 # Livraisons de patchs : jamais dans le dépôt
 *.zip
 *.patch
+
+# Classeurs de suivi (chiffres du snack) : jamais dans le dépôt public
+*.xlsx
+*.xls
