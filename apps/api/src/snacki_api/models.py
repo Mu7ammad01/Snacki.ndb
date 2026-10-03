@@ -1,4 +1,4 @@
-"""Tables de la base. J2 : le catalogue. J3 : les commandes. J6 : le staff et le journal d'audit."""
+"""Tables de la base. J2 : catalogue. J3 : commandes. J6 : staff et journal. J8 : historique."""
 
 import enum
 from datetime import date, datetime
@@ -97,7 +97,10 @@ class Order(Base):
         UniqueConstraint("service_day", "daily_no", name="uq_orders_day_no"),
         CheckConstraint("total_mru > 0", name="total_positive"),
         CheckConstraint("phone IS NULL OR phone ~ '^[234][0-9]{7}$'", name="phone_mr"),
-        CheckConstraint("source = 'comptoir' OR phone IS NOT NULL", name="phone_if_app"),
+        CheckConstraint(
+            "source = 'comptoir' OR phone IS NOT NULL OR anonymized_at IS NOT NULL",
+            name="phone_if_app",
+        ),
         CheckConstraint("delivery_fee_mru BETWEEN 0 AND 2000", name="delivery_fee_range"),
         CheckConstraint(
             "fulfilment = 'emporter' OR landmark IS NOT NULL", name="landmark_if_delivery"
@@ -136,6 +139,8 @@ class Order(Base):
     )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_reason: Mapped[str | None] = mapped_column(String(160))
+    # --- Conservation (J8) : coordonnées effacées après 90 jours, montants conservés ---
+    anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     lines: Mapped[list["OrderLine"]] = relationship(
         back_populates="order", cascade="all, delete-orphan", order_by="OrderLine.id"
@@ -215,3 +220,42 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(40))
     target: Mapped[str | None] = mapped_column(String(120))
     detail: Mapped[dict | None] = mapped_column(JSON)
+
+
+class HistorySale(Base):
+    """Vente de l'historique Excel (avant l'app). Montants en MRU ; aucune donnée personnelle."""
+
+    __tablename__ = "history_sale"
+    __table_args__ = (
+        UniqueConstraint("service_day", "ref", name="uq_history_day_ref"),
+        CheckConstraint("total_mru BETWEEN 1 AND 100000", name="history_total_range"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    service_day: Mapped[date] = mapped_column(Date, index=True)
+    ref: Mapped[str] = mapped_column(String(20))  # « cmd3 » : numéro de la ligne dans l'Excel
+    raw_text: Mapped[str] = mapped_column(String(200))
+    total_mru: Mapped[int]
+    batch: Mapped[str] = mapped_column(String(16))  # empreinte du fichier importé
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    items: Mapped[list["HistoryItem"]] = relationship(
+        back_populates="sale", cascade="all, delete-orphan", order_by="HistoryItem.id"
+    )
+
+
+class HistoryItem(Base):
+    """Article reconnu dans le texte d'une vente historique ; produit absent si hors menu."""
+
+    __tablename__ = "history_item"
+    __table_args__ = (CheckConstraint("quantity BETWEEN 1 AND 100", name="history_qty_range"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sale_id: Mapped[int] = mapped_column(ForeignKey("history_sale.id", ondelete="CASCADE"))
+    product_id: Mapped[str | None] = mapped_column(ForeignKey("product.id"))
+    label: Mapped[str] = mapped_column(String(60))
+    quantity: Mapped[int]
+
+    sale: Mapped[HistorySale] = relationship(back_populates="items")

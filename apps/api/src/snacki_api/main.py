@@ -5,7 +5,7 @@ Lancement local, depuis apps/api avec SNACKI_DATABASE_URL :
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request
@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from snacki_api import auth, caisse, orders, repository, staff
+from snacki_api import auth, caisse, orders, pilotage, repository, staff
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
 from snacki_api.models import Category, StaffRole, StaffUser
@@ -35,6 +35,7 @@ from snacki_api.schemas import (
     OrderIn,
     OrderTrackOut,
     PayIn,
+    PilotageOut,
     ProductOut,
     ReasonIn,
     StaffCreateIn,
@@ -48,6 +49,9 @@ log = logging.getLogger("snacki.api")
 SessionDep = Annotated[Session, Depends(get_session)]
 # Identifiant de produit : lettres minuscules et tirets, comme en base (liste blanche, ASVS V2.2.1).
 ProductId = Annotated[str, Path(pattern=r"^[a-z][a-z-]{0,39}$")]
+
+# Réponses avec jeton, données de commande ou chiffres de vente : jamais en cache.
+NO_STORE = ("/v1/orders", "/v1/auth", "/v1/staff", "/v1/caisse", "/v1/pilotage")
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -127,7 +131,7 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
         response = await call_next(request)
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)
-        if request.url.path.startswith(("/v1/orders", "/v1/auth", "/v1/staff", "/v1/caisse")):
+        if request.url.path.startswith(NO_STORE):
             # Réponses avec jeton ou données de commande : jamais en cache.
             response.headers["Cache-Control"] = "no-store"
         return response
@@ -392,6 +396,22 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
             order_id,
             lambda o: caisse.close(session, user, o, caisse.S.ANNULEE, data.reason),
         )
+
+    # --- Pilotage (J8) ----------------------------------------------------------------------
+
+    @app.get("/v1/pilotage", response_model=PilotageOut, tags=["pilotage"])
+    def pilotage_summary(
+        _user: ManagerDep,
+        session: SessionDep,
+        start: Annotated[date | None, Query()] = None,
+        end: Annotated[date | None, Query()] = None,
+    ) -> PilotageOut:
+        """Chiffre d'affaires, top produits, paiements : gérante et admin seulement (T26)."""
+        default_start, default_end = pilotage.default_period()
+        start, end = start or default_start, end or default_end
+        if start > end or (end - start).days >= pilotage.MAX_DAYS:
+            raise HTTPException(status_code=422, detail="Période invalide (366 jours au plus)")
+        return PilotageOut.model_validate(pilotage.summary(session, start, end))
 
     return app
 

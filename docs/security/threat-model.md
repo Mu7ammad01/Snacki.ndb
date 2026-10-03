@@ -1,8 +1,8 @@
 # Modèle de menaces de Snacki
 
-Version 8 · J7 (6 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
+Version 9 · J8 (7 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
-Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 25 menaces ci-dessous en découlent : 20 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6 et 2 à J7), les 5 autres ont leur jour de traitement dans le plan.
+Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 27 menaces ci-dessous en découlent : 22 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7 et 2 à J8), les 5 autres ont leur jour de traitement dans le plan.
 
 ## 1. Périmètre et hypothèses
 
@@ -48,11 +48,12 @@ Ce schéma est généré par `python3 scripts/render_dfd.py` à partir de [`thre
 
 | Donnée | Classification | Où | Conservation |
 | --- | --- | --- | --- |
-| Prénom, téléphone, repère de livraison | Personnelle | Base, table `orders` | 90 jours, puis anonymisée (les ventes agrégées restent) |
+| Prénom, téléphone, repère de livraison, remarque | Personnelle | Base, table `orders` | 90 jours, puis anonymisée à chaque déploiement (J8, `retention.py`) ; montants et produits restent |
+| Historique des ventes (Excel d'avant l'app) | Interne, confidentielle | Base, tables `history_sale` et `history_item` ; le fichier ne va jamais dans le dépôt (`.gitignore`) | Durée de vie du snack ; aucune donnée personnelle |
 | Jeton de suivi | Secret (capacité) | Base (empreinte SHA-256), fragment d'URL côté client | 24 h de validité |
 | E-mail Google du staff, rôle | Personnelle | Base, table `staff_user` | Tant que la personne travaille au snack |
 | Texte WhatsApp collé dans l'assistant | Personnelle avant masquage | Mémoire de l'API ; seule la version masquée est stockée | Version masquée : 30 jours |
-| Journal d'audit | Interne | Base, table `audit_log` | 1 an |
+| Journal d'audit | Interne | Base, table `audit_log` | 1 an, puis supprimé à chaque déploiement (J8) |
 | Journaux techniques | Interne | Cloud Logging | 30 jours, sans donnée personnelle |
 | Secrets | Secret | Secret Manager, GitHub Secrets | Rotation au moindre doute, sinon tous les 6 mois |
 
@@ -123,6 +124,8 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T23 | Cloud | D | Abus qui fait exploser la facture | 2 × 2 | moyen | Alerte de budget à 1 €, `max-instances=2`, quotas IA | V6.1.1 | J1 | **fait** (appliqué le 28/09/2026 : budget de 1 EUR actif) |
 | T24 | Base | I | Vol ou perte des données (compte Neon compromis, suppression) | 1 × 3 | moyen | 2FA sur Neon et Google, historique de 6 h, export hebdomadaire chiffré | V11.3.2 | J14 | prévu |
 | T25 | Flux 1 | S | Fausse commande de livraison passée avec le numéro d'un tiers, maintenant que WhatsApp ne confirme plus l'identité du client | 2 × 2 | moyen | Commande « reçue » à accepter par le staff, avec délai et frais ; numéro cliquable dans la caisse ; livraison impossible à marquer « remise » sans appel au client (409) ; refus motivé par la gérante ; limite de débit (T04) | V2.3.1 | J7 | **fait** (ADR 0009) |
+| T26 | Flux 9 | I | Un caissier, ou quiconque sans session, lit le chiffre d'affaires et les ventes du snack | 2 × 2 | moyen | `GET /v1/pilotage` réservé à la gérante et à l'admin (`require_role`, refus journalisé) ; page `/pilotage` fermée sans session (contrôle au déploiement) ; réponses `no-store` | V8.2.1 | J8 | **fait** (ADR 0010) |
+| T27 | Import | T | Classeur Excel piégé (bombe XML, entité externe, formule) qui fait planter ou détourne l'import | 1 × 2 | faible | Script d'administration, jamais un téléversement web ; .xlsx de 5 Mo au plus ; defusedxml ; valeurs lues sans formule ; feuille « Ventes » seule ; textes nettoyés et bornés ; essai à blanc avant d'écrire | V1.5.1 | J8 | **fait** (ADR 0010) |
 
 ## 8. Cas d'abus (tests à écrire)
 
@@ -138,6 +141,8 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 8. Un caissier appelle `POST /v1/caisse/orders/{id}/cancel` : 403 et une ligne `access_denied` au journal (T09, T11).
 9. Le staff passe une livraison de « prête » à « remise » sans avoir appelé le client, ou saute une étape : 409 (T25).
 10. Une vente au comptoir envoie `unit_price_mru` ou `total_mru` : 422, le total vient de la base (T01).
+11. Un caissier appelle `GET /v1/pilotage` : 403 et une ligne `access_denied` au journal (T26).
+12. Une période forgée (`start=2026-09-01'; DROP TABLE orders; --`) : 422, la requête n'atteint pas la base (T05).
 
 ## 9. Décisions prises grâce à cette analyse
 
@@ -150,6 +155,7 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | L'import de l'Excel historique est un script d'administration, pas un téléversement web | V5, V1.5.1 | [asvs-l1.md](asvs-l1.md) |
 | Seul un texte masqué part vers Gemini | T14 | [ADR 0004](../adr/0004-donnees-envoyees-a-l-ia.md) |
 | Connexion du staff gérée par l'API derrière le web : jetons dans des cookies HttpOnly, liste blanche d'adresses, rôle relu à chaque requête | T07–T10, T12 | [ADR 0008](../adr/0008-connexion-du-staff.md) |
+| L'historique Excel est importé par un script d'administration, dans des tables séparées des commandes ; montants en ancienne ouguiya divisés par 10 | T27, T26 | [ADR 0010](../adr/0010-pilotage-et-historique.md) |
 | Les portes de sécurité sont actives dès le premier commit | T17–T20 | [ADR 0002](../adr/0002-securite-des-le-premier-commit.md) |
 
 ## 10. Risques acceptés
@@ -174,3 +180,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 02/10/2026 | 6 | J5 (partie B) : T21 et T22 traitées (déploiement sans clé, comptes et secrets par environnement) ; API privée confirmée (ADR 0007) |
 | 05/10/2026 | 7 | J6 : T07, T08, T09, T10 et T12 traitées (connexion Google avec PKCE, sessions révocables, rôles, CSRF) ; journal d'audit créé (T11 en cours) |
 | 06/10/2026 | 8 | J7 : T11 traitée (journal des actions de caisse) ; T04 et T06 complétées ; nouvelle menace T25 (fausse commande sans WhatsApp) traitée ; risque « faux message WhatsApp » retiré, la commande ne passe plus par WhatsApp |
+| 07/10/2026 | 9 | J8 : T26 (pilotage réservé) et T27 (import Excel) traitées ; conservation appliquée (coordonnées 90 jours, journal 1 an) ; historique ajouté à l'inventaire des données |

@@ -86,6 +86,9 @@ where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${WEB_URL}/cais
 code="$(curl -s -o /dev/null -w '%{http_code}' "${WEB_URL}/api/caisse/orders")"
 [ "$code" = "401" ] || fail "commandes de la caisse sans session : ${code}"
 echo "    caisse : fermée sans session"
+where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${WEB_URL}/pilotage")"
+[[ "$where" == 307*"/connexion" ]] || fail "le pilotage doit renvoyer vers la connexion (${where})"
+echo "    pilotage : fermé sans session"
 
 echo "Version déployée en ${ENV} : ${WEB_URL}"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "web_url=${WEB_URL}" >>"$GITHUB_OUTPUT"; fi

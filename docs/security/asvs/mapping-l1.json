@@ -49,9 +49,10 @@
     "preuve": "pyproject.toml [tool.ruff.lint] select S"
   },
   "V1.5.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J8",
-    "controle": "Import de l'historique Excel (XML) : defusedxml installé pour openpyxl, import en script d'administration et non en téléversement web."
+    "controle": "Import de l'historique Excel : script d'administration (pas de téléversement web), .xlsx de 5 Mo au plus, feuille « Ventes » seule, defusedxml installé pour openpyxl (bombes XML, entités externes), valeurs lues sans exécuter de formule, textes nettoyés et bornés.",
+    "preuve": "apps/api/src/snacki_api/history.py, apps/api/tests/test_history.py"
   },
   "V2.1.1": {
     "statut": "fait",
@@ -131,7 +132,7 @@
   },
   "V4.4.1": {
     "statut": "N/A",
-    "raison": "Pas de WebSocket : le temps réel utilise Server-Sent Events en HTTPS."
+    "raison": "Pas de WebSocket ni de flux : la caisse et le suivi interrogent l'API à intervalle régulier en HTTPS (ADR 0009)."
   },
   "V5.2.1": {
     "statut": "N/A",

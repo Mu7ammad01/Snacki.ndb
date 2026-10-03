@@ -4,7 +4,7 @@ On ne renvoie jamais un objet de la base tel quel : chaque réponse liste ses ch
 """
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 
 from pydantic import (
@@ -277,3 +277,41 @@ class CounterOrderIn(BaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError("un produit ne doit apparaître qu'une fois (regrouper les quantités)")
         return self
+
+
+# --- Pilotage (J8) ------------------------------------------------------------------------
+
+
+class DayPoint(BaseModel):
+    day: date
+    app_mru: int
+    comptoir_mru: int
+    historique_mru: int
+
+
+class TopItem(BaseModel):
+    product_id: str | None
+    label: str
+    quantity: int
+    revenue_mru: int  # ventes de l'app et du comptoir ; l'historique n'a pas de prix par article
+
+
+class PaymentPoint(BaseModel):
+    method: str
+    count: int
+    amount_mru: int
+
+
+class PilotageOut(BaseModel):
+    start: date
+    end: date
+    revenue_mru: int
+    orders: int
+    average_basket_mru: int
+    today_mru: int
+    all_time_mru: int
+    by_day: list[DayPoint]
+    top: list[TopItem]
+    payments: list[PaymentPoint]
+    history_first: date | None
+    history_last: date | None

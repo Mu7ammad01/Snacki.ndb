@@ -41,10 +41,10 @@ export default async function StaffHome() {
           </a>
         )}
         {show.pilotage && (
-          <div className="track">
-            <h2>Pilotage</h2>
-            <p className="muted">Chiffre d&apos;affaires, produits les plus vendus, historique. Arrive à J8.</p>
-          </div>
+          <a className="track staff-link" href="/pilotage">
+            <h2>Pilotage →</h2>
+            <p className="muted">Chiffre d&apos;affaires, produits les plus vendus, moyens de paiement, historique.</p>
+          </a>
         )}
       </section>
 
