@@ -37,3 +37,7 @@ reports/
 Thumbs.db
 .idea/
 .vscode/
+
+# Livraisons de patchs : jamais dans le dépôt
+*.zip
+*.patch
