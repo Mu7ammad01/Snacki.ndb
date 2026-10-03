@@ -81,6 +81,11 @@ code="$(curl -s -o /dev/null -w '%{http_code}' "${WEB_URL}/connexion")"
 where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${WEB_URL}/staff")"
 [[ "$where" == 307*"/connexion" ]] || fail "l'espace staff doit renvoyer vers la connexion (${where})"
 echo "    espace staff : fermé sans session"
+where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${WEB_URL}/caisse")"
+[[ "$where" == 307*"/connexion" ]] || fail "la caisse doit renvoyer vers la connexion (${where})"
+code="$(curl -s -o /dev/null -w '%{http_code}' "${WEB_URL}/api/caisse/orders")"
+[ "$code" = "401" ] || fail "commandes de la caisse sans session : ${code}"
+echo "    caisse : fermée sans session"
 
 echo "Version déployée en ${ENV} : ${WEB_URL}"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "web_url=${WEB_URL}" >>"$GITHUB_OUTPUT"; fi

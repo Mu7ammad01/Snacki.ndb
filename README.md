@@ -1,10 +1,10 @@
 # Snacki
 
-PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à Nouadhibou (Mauritanie) : les clients commandent en français ou en arabe et confirment sur WhatsApp, le staff tient la caisse et suit les commandes en direct, les associés pilotent les ventes. Une IA prévoit les achats de fruits et transforme les messages WhatsApp en commandes.
+PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à Nouadhibou (Mauritanie) : les clients commandent en français ou en arabe directement dans l'app (WhatsApp reste un lien de contact), le staff tient la caisse et suit les commandes en direct, les associés pilotent les ventes. Une IA prévoit les achats de fruits et transforme les messages WhatsApp en commandes.
 
 Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
 
-> État : **J4 / 15** · Front client Next.js branché sur l'API Python : menu FR/AR, commande (total calculé par l'API), confirmation WhatsApp, suivi par lien `/suivi#jeton`, CSP à nonce. Mise en ligne à J5.
+> État : **J7 / 15** · En ligne sur Cloud Run (staging puis production approuvée). Connexion du staff avec Google et rôles (J6). Caisse : commandes du jour en direct, acceptation avec délai et frais, refus et annulation réservés à la gérante, appel avant livraison, encaissement, vente au comptoir, journal d'audit ([ADR 0009](docs/adr/0009-caisse-et-cycle-de-commande.md)).
 
 ## Architecture
 
