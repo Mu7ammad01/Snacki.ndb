@@ -9,14 +9,16 @@
     }
   },
   "V1.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "React échappe le texte par défaut ; aucun dangerouslySetInnerHTML ; règle ESLint qui l'interdit."
+    "controle": "React n'insère que du texte (échappement automatique) ; aucun dangerouslySetInnerHTML, innerHTML, document.write ni eval dans le front, vérifié par un test qui parcourt les sources ; CSP à nonce.",
+    "preuve": "apps/web/tests/securite.test.ts (T06 · XSS)"
   },
   "V1.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "Liens wa.me construits avec encodeURIComponent ; paramètres d'URL côté API encodés par httpx."
+    "controle": "Lien wa.me construit avec encodeURIComponent ; le message de contact ne reprend que le numéro de commande s'il respecte le motif SNK-AAAA-NNN ; liens tel: construits seulement pour un numéro mauritanien valide ; jeton de suivi validé avant d'entrer dans l'URL du fragment.",
+    "preuve": "apps/web/src/lib/whatsapp.ts, apps/web/src/lib/caisse.ts, apps/web/tests/commande.test.ts, apps/web/tests/caisse.test.ts"
   },
   "V1.2.3": {
     "statut": "fait",
@@ -70,39 +72,46 @@
     "preuve": "apps/api/tests/test_orders.py : test_prix_envoye_par_le_client_refuse, test_total_calcule_par_le_serveur"
   },
   "V2.3.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J7",
-    "controle": "Machine à états des commandes (reçue → en préparation → prête → livrée) appliquée par l'API ; transition interdite = 409."
+    "controle": "Machine à états des commandes appliquée par l'API (reçue → acceptée → en préparation → prête → remise ; refus depuis « reçue », annulation en cours, gérante ou admin) ; transition absente du tableau = 409, commande verrouillée (SELECT … FOR UPDATE) ; remise d'une livraison impossible avant l'appel au client ; encaissement unique.",
+    "preuve": "apps/api/src/snacki_api/caisse.py, apps/api/tests/test_caisse.py::test_transitions_interdites"
   },
   "V3.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "En-têtes X-Content-Type-Options: nosniff et Content-Type exact sur toutes les réponses ; CSP stricte."
+    "controle": "En-têtes nosniff, Content-Type exact et CSP sur toutes les réponses du web et de l'API ; vérifiés par les tests et par le contrôle de fumée de chaque déploiement.",
+    "preuve": "apps/api/tests/test_security.py, apps/web/tests/securite.test.ts, infra/gcp/deploy.sh"
   },
   "V3.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "Textes saisis affichés comme texte (React / textContent), jamais comme HTML."
+    "controle": "Textes saisis (prénom, repère, remarque) affichés comme texte par React et ramenés sur une seule ligne dans le message WhatsApp (oneLine) ; aucune insertion HTML.",
+    "preuve": "apps/web/src/lib/validate.ts, apps/web/tests/commande.test.ts"
   },
   "V3.3.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Cookie de session __Host-snacki_session avec Secure, HttpOnly, SameSite=Lax, Path=/."
+    "controle": "Cookie de session __Host-snacki_session : Secure, HttpOnly, SameSite=Lax, Path=/, 8 h ; cookie de parcours OAuth de 10 min sur le même modèle.",
+    "preuve": "apps/web/src/lib/staff.ts, apps/web/tests/staff.test.ts"
   },
   "V3.4.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "Strict-Transport-Security: max-age=31536000; includeSubDomains sur web et api."
+    "controle": "Strict-Transport-Security: max-age=31536000; includeSubDomains sur le web et l'API ; présence vérifiée à chaque déploiement.",
+    "preuve": "apps/web/next.config.ts, apps/api/src/snacki_api/main.py, infra/gcp/deploy.sh"
   },
   "V3.4.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "API non exposée au navigateur (appelée par web) : aucun en-tête CORS ; si besoin, origine fixe."
+    "controle": "API privée (IAM Cloud Run, 403 sans jeton), appelée seulement par le serveur web : aucun en-tête CORS servi.",
+    "preuve": "infra/gcp/setup-deploy.sh, infra/gcp/deploy.sh, docs/adr/0007-deploiement-cloud-run.md"
   },
   "V3.5.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Protection CSRF : SameSite=Lax + jeton CSRF (double soumission) sur les requêtes du staff qui modifient."
+    "controle": "Protection CSRF : SameSite=Lax + vérification de l'en-tête Origin (adresse publique configurée, jamais Host) sur chaque requête du staff qui modifie ; state OAuth contre le CSRF de connexion.",
+    "preuve": "apps/web/src/lib/staff.ts, apps/web/src/app/api/staff, apps/api/tests/test_staff.py"
   },
   "V3.5.2": {
     "statut": "N/A",
@@ -115,9 +124,10 @@
     "preuve": "apps/api/tests/test_orders.py : test_suivi_sans_effet_de_bord"
   },
   "V4.1.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J7",
-    "controle": "Content-Type JSON avec charset fixé par l'API pour toutes les routes (fait, J2-J3, testé) ; flux SSE en text/event-stream à vérifier à J7."
+    "controle": "Toutes les réponses de l'API sont du JSON avec charset fixé (Utf8JSONResponse) ; pas de flux SSE (suivi par interrogation périodique, ADR 0009).",
+    "preuve": "apps/api/tests/test_security.py::test_en_tetes_de_securite, apps/api/tests/test_caisse.py"
   },
   "V4.4.1": {
     "statut": "N/A",
@@ -178,14 +188,16 @@
     "raison": "Aucun mot de passe géré par Snacki."
   },
   "V6.3.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Attaques sur les identifiants portées par Google ; limite de débit sur /auth/* ; seuls les e-mails de la liste du staff sont acceptés."
+    "controle": "Mots de passe gérés par Google ; limite de débit sur /v1/auth/* (10/min, 30/h) ; seules les adresses de la table staff_user sont acceptées.",
+    "preuve": "apps/api/src/snacki_api/ratelimit.py, apps/api/tests/test_staff.py"
   },
   "V6.3.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Aucun compte par défaut : la liste du staff part vide et le premier admin est créé par une migration à partir d'un e-mail en variable d'environnement."
+    "controle": "Aucun compte par défaut : la table du staff part vide ; le premier admin est créé par le job de migration à partir de SNACKI_BOOTSTRAP_ADMIN_EMAIL, une seule fois.",
+    "preuve": "apps/api/src/snacki_api/manage.py, apps/api/src/snacki_api/staff.py"
   },
   "V6.4.1": {
     "statut": "N/A",
@@ -196,34 +208,40 @@
     "raison": "Aucune question secrète ni indice de mot de passe."
   },
   "V7.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Le JWT est vérifié uniquement par l'API, jamais par le front."
+    "controle": "La session est vérifiée uniquement par l'API (signature, audience, expiration, version), jamais par le web.",
+    "preuve": "apps/api/src/snacki_api/main.py (require_role)"
   },
   "V7.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Jetons de session générés à chaque connexion, signés avec une clé stockée dans Secret Manager ; aucune clé d'API statique pour le staff."
+    "controle": "Jeton de session signé par l'API à chaque connexion, clé de 48 octets aléatoires dans Secret Manager ; aucune clé d'API statique pour le staff.",
+    "preuve": "apps/api/src/snacki_api/auth.py, infra/gcp/setup-auth.sh"
   },
   "V7.2.3": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Jeton de suivi client tiré avec secrets.token_urlsafe (128 bits) : fait à J3 (apps/api/src/snacki_api/orders.py). Identifiant de jeton (jti) de session staff : J6."
+    "controle": "Jeton de suivi : secrets.token_urlsafe (128 bits) ; state, nonce et vérificateur PKCE : secrets (192 à 256 bits).",
+    "preuve": "apps/api/src/snacki_api/orders.py, apps/api/src/snacki_api/auth.py"
   },
   "V7.2.4": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Nouveau jeton à chaque connexion ; l'ancien cookie est remplacé et son jti révoqué."
+    "controle": "Nouveau jeton de session à chaque connexion ; la déconnexion, un changement de rôle ou une désactivation révoquent toutes les sessions du compte (version de session).",
+    "preuve": "apps/api/src/snacki_api/staff.py, apps/api/tests/test_staff.py"
   },
   "V7.4.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Déconnexion : jti ajouté à une liste de révocation en base, vérifiée à chaque requête ; durée de vie maximale 8 h."
+    "controle": "Déconnexion : la version de session du compte augmente, l'API refuse aussitôt les anciens jetons ; durée de vie maximale 8 h.",
+    "preuve": "apps/api/tests/test_staff.py (test_deconnexion_invalide_la_session)"
   },
   "V7.4.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Le rôle est relu en base à chaque requête : désactiver un membre du staff coupe immédiatement toutes ses sessions."
+    "controle": "Le compte et son rôle sont relus en base à chaque requête : désactivation ou changement de rôle effectifs immédiatement.",
+    "preuve": "apps/api/tests/test_staff.py (test_desactivation_immediate)"
   },
   "V8.1.1": {
     "statut": "fait",
@@ -232,9 +250,10 @@
     "preuve": "docs/security/threat-model.md#5"
   },
   "V8.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Dépendance FastAPI require_role() sur chaque route du staff ; test qui échoue si une route n'en a pas."
+    "controle": "Dépendance require_role() sur chaque route du staff ; un test échoue si une route non publique n'en a pas.",
+    "preuve": "apps/api/tests/test_staff.py (test_chaque_route_non_publique_exige_un_role)"
   },
   "V8.2.2": {
     "statut": "fait",
@@ -243,29 +262,34 @@
     "preuve": "apps/api/tests/test_orders.py : test_un_jeton_n_ouvre_que_sa_commande, test_jeton_invalide_meme_reponse, test_jeton_expire"
   },
   "V8.3.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Tous les contrôles d'accès dans l'API ; le front ne fait que masquer des boutons."
+    "controle": "Tous les contrôles d'accès dans l'API ; le web ne fait que masquer des sections.",
+    "preuve": "apps/api/src/snacki_api/main.py, apps/web/src/lib/staff.ts (sectionsFor)"
   },
   "V9.1.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "JWT vérifiés par signature (bibliothèque PyJWT) avant toute lecture du contenu."
+    "controle": "Jetons vérifiés par signature (PyJWT) avant toute lecture du contenu : sessions, parcours OAuth, jetons d'identité Google.",
+    "preuve": "apps/api/src/snacki_api/auth.py"
   },
   "V9.1.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Algorithme imposé : algorithms=[\"HS256\"] ; 'none' refusé ; test dédié."
+    "controle": "Algorithmes imposés : HS256 pour les jetons de l'API, RS256 pour Google ; « none » et la confusion HS256/RS256 refusés, testés.",
+    "preuve": "apps/api/tests/test_staff.py"
   },
   "V9.1.3": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Clé de signature lue uniquement dans Secret Manager ; jetons d'identité Google vérifiés avec les clés publiées par Google (JWKS)."
+    "controle": "Clé de session lue dans Secret Manager ; jetons d'identité Google vérifiés avec les clés publiées par Google (JWKS), audience et émetteur contrôlés.",
+    "preuve": "apps/api/src/snacki_api/auth.py"
   },
   "V9.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "exp et nbf vérifiés, tolérance d'horloge de 30 s."
+    "controle": "exp vérifié (et iat exigé pour Google), tolérance d'horloge de 30 s sur les jetons Google ; sessions et parcours expirés refusés, testés.",
+    "preuve": "apps/api/tests/test_staff.py"
   },
   "V10.4.1": {
     "statut": "N/A",
@@ -289,7 +313,7 @@
   },
   "V11.3.1": {
     "statut": "prévu",
-    "jour": "J6",
+    "jour": "J12",
     "controle": "Aucun chiffrement maison : TLS et bibliothèques reconnues uniquement ; règle Semgrep sur les modes ECB."
   },
   "V11.3.2": {
@@ -298,9 +322,10 @@
     "controle": "Export de sauvegarde chiffré en AES-GCM (bibliothèque cryptography)."
   },
   "V11.4.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "SHA-256 / HMAC-SHA-256 uniquement ; Bandit B303/B324 contre MD5 et SHA-1."
+    "controle": "SHA-256 et HMAC-SHA-256 uniquement (jeton de suivi, PKCE S256, signatures HS256) ; Bandit (B303, B324) dans pre-commit et la CI.",
+    "preuve": "apps/api/src/snacki_api/auth.py, .pre-commit-config.yaml"
   },
   "V12.1.1": {
     "statut": "à vérifier",
@@ -308,29 +333,34 @@
     "controle": "TLS géré par Google (Cloud Run) et Neon : versions mesurées avec testssl.sh et consignées dans le rapport de pentest."
   },
   "V12.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "HTTPS partout, HSTS ; connexion Neon en sslmode=require ; aucun appel HTTP en clair."
+    "controle": "HTTPS uniquement (Cloud Run), HSTS ; base Neon en sslmode=require, imposé par la configuration de l'API en staging et en production ; web → API en HTTPS.",
+    "preuve": "apps/api/src/snacki_api/config.py, infra/gcp/setup-deploy.sh"
   },
   "V12.2.2": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "Certificats publics gérés par Google sur *.run.app."
+    "controle": "Certificats publics gérés par Google sur *.run.app.",
+    "preuve": "docs/adr/0007-deploiement-cloud-run.md"
   },
   "V13.4.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": ".dockerignore exclut .git ; image multi-étapes qui ne copie que le code utile ; vérifié par Trivy et un test."
+    "controle": "Images multi-étapes : .dockerignore en liste blanche côté API ; aucune copie de .git, des tests ni de .env, vérifié en CI à chaque PR ; npm et pip retirés des images finales.",
+    "preuve": "apps/api/Dockerfile, apps/web/Dockerfile, .github/workflows/ci.yml (job image)"
   },
   "V14.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J4",
-    "controle": "Côté API (J3, fait) : jeton de suivi reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL, aucune donnée personnelle dans les URL (test_jeton_refuse_dans_l_url). Côté front (J4) : jeton placé dans le fragment d'URL (#)."
+    "controle": "API : jeton reçu dans l'en-tête X-Tracking-Token, refusé dans l'URL. Front : lien /suivi#jeton, le fragment n'est jamais envoyé au serveur ; la page le lit et l'envoie en en-tête. Aucune donnée personnelle dans les URL.",
+    "preuve": "apps/api/tests/test_orders.py::test_jeton_refuse_dans_l_url, apps/web/src/lib/token.ts, apps/web/tests/securite.test.ts"
   },
   "V14.3.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J6",
-    "controle": "Déconnexion : en-tête Clear-Site-Data \"cache\", \"storage\" et suppression du cookie."
+    "controle": "Déconnexion : cookie supprimé et en-tête Clear-Site-Data \"cache\", \"storage\".",
+    "preuve": "apps/web/src/app/auth/logout/route.ts"
   },
   "V15.1.1": {
     "statut": "fait",
@@ -339,9 +369,10 @@
     "preuve": "SECURITY.md"
   },
   "V15.2.1": {
-    "statut": "prévu",
+    "statut": "fait",
     "jour": "J5",
-    "controle": "Portes 6 et 7 (pip-audit, npm audit, Trivy) bloquent toute dépendance hors délai ; Dependabot actif dès J1."
+    "controle": "Porte 6 : pip-audit (strict) et npm audit (hautes et critiques) bloquants ; porte 7 : Trivy bloque toute faille haute ou critique corrigible dans les images ; Dependabot (pip, npm, docker, actions) chaque lundi.",
+    "preuve": ".github/workflows/ci.yml (jobs deps et image), .github/dependabot.yml"
   },
   "V15.3.1": {
     "statut": "fait",

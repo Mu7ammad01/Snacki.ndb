@@ -1,10 +1,10 @@
 # Snacki
 
-PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à Nouadhibou (Mauritanie) : les clients commandent en français ou en arabe et confirment sur WhatsApp, le staff tient la caisse et suit les commandes en direct, les associés pilotent les ventes. Une IA prévoit les achats de fruits et transforme les messages WhatsApp en commandes.
+PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à Nouadhibou (Mauritanie) : les clients commandent en français ou en arabe directement dans l'app (WhatsApp reste un lien de contact), le staff tient la caisse et suit les commandes en direct, les associés pilotent les ventes. Une IA prévoit les achats de fruits et transforme les messages WhatsApp en commandes.
 
 Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
 
-> État : **J3 / 15** · API Python : menu des 9 produits, commande côté serveur (total recalculé), suivi par jeton aléatoire, limite de débit. Le front client arrive à J4.
+> État : **J7 / 15** · En ligne sur Cloud Run (staging puis production approuvée). Connexion du staff avec Google et rôles (J6). Caisse : commandes du jour en direct, acceptation avec délai et frais, refus et annulation réservés à la gérante, appel avant livraison, encaissement, vente au comptoir, journal d'audit ([ADR 0009](docs/adr/0009-caisse-et-cycle-de-commande.md)).
 
 ## Architecture
 
@@ -35,9 +35,11 @@ flowchart LR
 | 1 · Secrets | gitleaks (poste + CI), protection des pushs GitHub | J1 |
 | 2 · Qualité et sécurité du code | ruff (règles `S`), Bandit | J1 |
 | Chaîne d'approvisionnement | actions épinglées par SHA, Dependabot | J1 |
-| 3 · Tests de l'API | pytest sur PostgreSQL, couverture ≥ 80 %, migrations réversibles | J2 |
+| 3 · Tests de l'API et du front | pytest sur PostgreSQL (couverture ≥ 80 %, migrations réversibles) ; Vitest, types et build Next.js | J2, J4 |
 | 4 · Tests d'autorisation | pytest : accès croisé aux commandes (anti-BOLA) | J3 |
-| 5–7 · SAST, dépendances, image | CodeQL, Semgrep, pip-audit, Trivy | J5 |
+| 5 · Analyse du code (SAST) | CodeQL (Python, TypeScript), ruff `S`, Bandit | J5 |
+| 6 · Dépendances (SCA) | pip-audit, npm audit, Dependabot | J5 |
+| 7 · Images Docker | non root, aucun fichier inutile, Trivy | J5 |
 | 8 · IA | jeu d'évaluation de l'assistant | J9 |
 | 9 · Application en ligne | OWASP ZAP | J12 |
 
@@ -60,15 +62,26 @@ pytest                        # tests des outils de sécurité
 
 Travailler toujours sur une branche (`git switch -c j2-socle-api`) : `main` n'accepte que des pull requests.
 
+## Déployer
+
+Chaque fusion sur `main` déclenche `.github/workflows/deploy.yml` après une CI verte : images construites et analysées une fois, publiées dans Artifact Registry, déployées en **staging**, puis en **production** après approbation dans GitHub ([ADR 0007](docs/adr/0007-deploiement-cloud-run.md)). Aucune clé Google n'est stockée : GitHub s'authentifie par Workload Identity Federation.
+
+| Service | Accès |
+| --- | --- |
+| `snacki-web-staging`, `snacki-web-prod` | public (HTTPS) |
+| `snacki-api-staging`, `snacki-api-prod` | privé : seul le serveur web du même environnement peut l'appeler |
+
+Mise en place, une seule fois : `./infra/gcp/setup-deploy.sh <projet> <propriétaire/dépôt>`, puis `./infra/gcp/setup-auth.sh` pour la connexion du staff ([ADR 0008](docs/adr/0008-connexion-du-staff.md)).
+
 ## Organisation du dépôt
 
 ```
 apps/api/        API FastAPI (voir apps/api/README.md)
-apps/web/        PWA Next.js (à partir de J4)
+apps/web/        PWA Next.js (voir apps/web/README.md)
 docs/security/   modèle de menaces (as code + texte), ASVS, schéma de flux
 docs/adr/        décisions d'architecture
 infra/github/    réglages de sécurité du dépôt (branche protégée, alertes)
-infra/gcp/       projet Google Cloud, API, alerte de budget
+infra/gcp/       projet Google Cloud, budget, déploiement (comptes, secrets, Cloud Run)
 scripts/         outils Python : vérification du dépôt, ASVS, schéma de flux
 tests/           tests des outils
 ```

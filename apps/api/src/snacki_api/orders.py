@@ -13,8 +13,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from snacki_api.models import Order, OrderLine, Product
-from snacki_api.schemas import OrderIn
+from snacki_api.models import Order, OrderLine, OrderSource, Product
+from snacki_api.schemas import OrderIn, OrderItemIn
 
 TOKEN_BYTES = 16  # 128 bits (ASVS V7.2.3 : au moins 128 bits d'entropie)
 TOKEN_TTL = timedelta(hours=24)
@@ -29,8 +29,26 @@ def token_hash(token: str) -> str:
 
 
 def create_order(session: Session, data: OrderIn) -> tuple[Order, str]:
-    """Crée la commande et renvoie (commande, jeton de suivi en clair)."""
-    ids = [item.product_id for item in data.items]
+    """Commande passée dans l'app. Renvoie (commande, jeton de suivi en clair)."""
+    return new_order(
+        session,
+        data.items,
+        source=OrderSource.APP,
+        customer_name=data.customer_name,
+        phone=data.phone,
+        fulfilment=data.fulfilment,
+        landmark=data.landmark,
+        note=data.note,
+        pay_pref=data.pay_pref,
+    )
+
+
+def new_order(session: Session, items: list[OrderItemIn], **fields) -> tuple[Order, str]:
+    """Crée une commande (app ou comptoir) : prix lus en base, numéro du jour, jeton de suivi.
+
+    Le total est toujours calculé ici (T01) ; `fields` ne contient que des valeurs déjà validées.
+    """
+    ids = [item.product_id for item in items]
     prices = dict(
         session.execute(
             select(Product.id, Product.price_mru).where(
@@ -52,10 +70,6 @@ def create_order(session: Session, data: OrderIn) -> tuple[Order, str]:
     order = Order(
         service_day=day,
         daily_no=(last or 0) + 1,
-        customer_name=data.customer_name,
-        phone=data.phone,
-        fulfilment=data.fulfilment,
-        landmark=data.landmark,
         tracking_hash=token_hash(token),
         tracking_expires_at=now + TOKEN_TTL,
         lines=[
@@ -64,8 +78,9 @@ def create_order(session: Session, data: OrderIn) -> tuple[Order, str]:
                 quantity=item.quantity,
                 unit_price_mru=prices[item.product_id],
             )
-            for item in data.items
+            for item in items
         ],
+        **fields,
     )
     order.total_mru = sum(line.line_total_mru for line in order.lines)
     session.add(order)

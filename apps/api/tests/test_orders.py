@@ -213,3 +213,34 @@ def test_limite_du_suivi(client):
         client.get(TRACK, headers={"X-Tracking-Token": "A" * 22})
     r = client.get(TRACK, headers={"X-Tracking-Token": "A" * 22})
     assert r.status_code == 429
+
+
+def test_adresse_transmise_par_le_web_si_autorisee(settings):
+    from fastapi.testclient import TestClient
+
+    from snacki_api.main import create_app
+
+    web = TestClient(create_app(settings.model_copy(update={"trust_forwarded_for": True})))
+    for _ in range(5):
+        assert (
+            web.post(
+                "/v1/orders", json=commande(), headers={"X-Forwarded-For": "41.1.1.1"}
+            ).status_code
+            == 201
+        )
+    assert (
+        web.post("/v1/orders", json=commande(), headers={"X-Forwarded-For": "41.1.1.1"}).status_code
+        == 429
+    )
+    # Un autre client, derrière le même serveur web, garde sa propre limite.
+    assert (
+        web.post("/v1/orders", json=commande(), headers={"X-Forwarded-For": "41.2.2.2"}).status_code
+        == 201
+    )
+
+
+def test_adresse_transmise_ignoree_par_defaut(client):
+    for i in range(5):
+        creer(client)
+        client.headers["X-Forwarded-For"] = f"41.0.0.{i}"
+    assert client.post("/v1/orders", json=commande()).status_code == 429

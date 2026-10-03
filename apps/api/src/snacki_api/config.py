@@ -32,6 +32,23 @@ class Settings(BaseSettings):
     database_url: SecretStr
     cors_origins: list[str] = Field(default_factory=list)
     db_pool_size: int = Field(default=5, ge=1, le=20)
+    # Adresse du client prise dans X-Forwarded-For (posé par le serveur web) pour la limite de
+    # débit. À n'activer que si l'API n'est joignable que par le serveur web (IAM Cloud Run, J5) :
+    # sinon n'importe qui pourrait choisir son adresse et contourner la limite.
+    trust_forwarded_for: bool = False
+
+    # --- Connexion du staff (J6, ADR 0008) ---
+    # Client OAuth Google de l'environnement (un client par environnement, T22).
+    oauth_client_id: str = ""
+    oauth_client_secret: SecretStr | None = None
+    # Adresse de retour enregistrée chez Google : https://<web>/auth/callback (jamais déduite
+    # de la requête, pour qu'un en-tête Host forgé ne puisse pas la détourner).
+    oauth_redirect_uri: str = ""
+    # Clé de signature des sessions du staff (32 octets aléatoires au moins), dans Secret Manager.
+    session_secret: SecretStr | None = None
+    session_hours: int = Field(default=8, ge=1, le=12)
+    # Premier compte administrateur, créé par la migration s'il n'existe encore aucun admin.
+    bootstrap_admin_email: str = ""
 
     @field_validator("database_url")
     @classmethod
@@ -51,10 +68,22 @@ class Settings(BaseSettings):
             query = parse_qs(urlsplit(self.database_url.get_secret_value()).query)
             if query.get("sslmode", [""])[0] not in ("require", "verify-full"):
                 raise ValueError("En staging et en production, la base exige sslmode=require")
+            secret = self.session_secret.get_secret_value() if self.session_secret else ""
+            if len(secret) < 32:
+                raise ValueError("SNACKI_SESSION_SECRET obligatoire en staging et en production")
+            if not (self.oauth_client_id and self.oauth_client_secret):
+                raise ValueError("En staging et en production, le client OAuth est obligatoire")
+            if not self.oauth_redirect_uri.startswith("https://"):
+                raise ValueError("SNACKI_OAUTH_REDIRECT_URI doit être une adresse HTTPS")
             for origin in self.cors_origins:
                 if not origin.startswith("https://"):
                     raise ValueError(f"Origine CORS non HTTPS refusée : {origin}")
         return self
+
+    @property
+    def auth_enabled(self) -> bool:
+        """La connexion du staff n'est possible que si le client OAuth et la clé existent."""
+        return bool(self.oauth_client_id and self.oauth_client_secret and self.session_secret)
 
     @property
     def docs_enabled(self) -> bool:

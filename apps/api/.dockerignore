@@ -1,0 +1,8 @@
+# Seuls requirements.txt, alembic.ini, migrations/ et src/ entrent dans l'image.
+*
+!requirements.txt
+!alembic.ini
+!migrations/
+!src/
+**/__pycache__
+**/*.pyc

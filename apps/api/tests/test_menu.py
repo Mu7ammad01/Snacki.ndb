@@ -68,3 +68,9 @@ def test_la_base_refuse_un_prix_aberrant():
     with get_sessionmaker()() as s, pytest.raises(IntegrityError):
         s.execute(update(Product).where(Product.id == "crepe").values(price_mru=-5))
         s.flush()
+
+
+def test_mojito_sans_mention_d_alcool(client):
+    mojito = client.get("/v1/menu/mojito").json()
+    assert mojito["description_fr"] == "Menthe et citron vert"
+    assert "كحول" not in mojito["description_ar"]

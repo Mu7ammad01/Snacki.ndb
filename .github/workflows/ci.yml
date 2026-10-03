@@ -1,4 +1,6 @@
-# CI : portes 1 (secrets), 2 (qualité), tests des outils (J1) et de l'API sur PostgreSQL (J2).
+# CI : portes 1 (secrets), 2 (qualité), 3 (tests : outils, API sur PostgreSQL, front Next.js),
+# 6 (dépendances : pip-audit, npm audit) et 7 (images Docker : non root, Trivy). La porte 5 (CodeQL)
+# est dans codeql.yml.
 # Les portes suivantes s'ajoutent au fil du plan (J3, J5, J9, J12).
 name: ci
 
@@ -19,7 +21,7 @@ concurrency:
 jobs:
   secrets:
     name: secrets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -36,7 +38,7 @@ jobs:
 
   quality:
     name: quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,7 +57,7 @@ jobs:
 
   tests:
     name: tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,7 +73,7 @@ jobs:
 
   api:
     name: api
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # Même moteur qu'en production (Neon) : les tests tournent sur un vrai PostgreSQL, jetable.
     services:
@@ -106,3 +108,83 @@ jobs:
           alembic downgrade base
       - name: Tests de l'API (couverture minimale 80 %)
         run: python -m pytest --cov --cov-report=term-missing
+
+  web:
+    name: web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Installer (versions exactes du package-lock.json)
+        run: npm ci --no-audit --no-fund
+      - name: Vérification des types
+        run: npx tsc --noEmit
+      - name: Tests (XSS, jeton, panier, message WhatsApp)
+        run: npm test
+      - name: Construction de production
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
+
+  deps:
+    name: deps
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Installer pip-audit
+        run: python -m pip install pip-audit==2.10.1
+      - name: Failles connues dans les dépendances Python de l'API
+        run: pip-audit --strict -r apps/api/requirements.txt
+      - name: Failles connues (hautes ou critiques) dans les dépendances npm livrées
+        working-directory: apps/web
+        run: npm audit --omit=dev --audit-level=high
+
+  image:
+    name: image (${{ matrix.service }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Construire l'image
+        run: docker build --pull -t snacki-${{ matrix.service }}:ci apps/${{ matrix.service }}
+      - name: L'image tourne sans droits root
+        run: |
+          uid=$(docker run --rm --entrypoint id snacki-${{ matrix.service }}:ci -u)
+          echo "uid=$uid"
+          test "$uid" != "0"
+      - name: Le dépôt n'est pas copié dans l'image (.git, tests, .env)
+        run: |
+          ! docker run --rm --entrypoint sh snacki-${{ matrix.service }}:ci -c 'ls -a /app' | grep -E '^(\.git|tests|\.env)$'
+      - name: Porte 7 · failles connues dans l'image (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: snacki-${{ matrix.service }}:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table

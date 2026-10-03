@@ -64,11 +64,25 @@ def test_secret_absent_des_erreurs_de_validation():
     assert "URL PostgreSQL" in str(err.value)
 
 
+# Réglages minimaux d'un environnement en ligne (connexion du staff configurée, J6).
+PROD_AUTH = {
+    "session_secret": "k" * 40,
+    "oauth_client_id": "client-test",
+    "oauth_client_secret": "secret-de-test",
+    "oauth_redirect_uri": "https://web.test/auth/callback",
+}
+
+
 def test_production_exige_tls_vers_la_base():
     with pytest.raises(ValidationError, match="sslmode"):
-        Settings(_env_file=None, environment="prod", database_url="postgresql://u:p@h/db")
+        Settings(
+            _env_file=None, environment="prod", database_url="postgresql://u:p@h/db", **PROD_AUTH
+        )
     ok = Settings(
-        _env_file=None, environment="prod", database_url="postgresql://u:p@h/db?sslmode=require"
+        _env_file=None,
+        environment="prod",
+        database_url="postgresql://u:p@h/db?sslmode=require",
+        **PROD_AUTH,
     )
     assert ok.database_url.get_secret_value().startswith("postgresql+psycopg://")
 
@@ -80,12 +94,16 @@ def test_production_refuse_origine_cors_en_clair():
             environment="prod",
             database_url="postgresql://u:p@h/db?sslmode=require",
             cors_origins=["http://snacki.example"],
+            **PROD_AUTH,
         )
 
 
 def test_documentation_masquee_en_production():
     prod = Settings(
-        _env_file=None, environment="prod", database_url="postgresql://u:p@h/db?sslmode=require"
+        _env_file=None,
+        environment="prod",
+        database_url="postgresql://u:p@h/db?sslmode=require",
+        **PROD_AUTH,
     )
     app = create_app(prod)
     assert app.openapi_url is None and app.docs_url is None
@@ -97,6 +115,7 @@ def test_en_tetes_de_securite(client):
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["x-frame-options"] == "DENY"
     assert "default-src 'none'" in r.headers["content-security-policy"]
+    assert r.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
 
 
 def test_cors_origine_fixe(settings):
