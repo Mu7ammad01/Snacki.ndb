@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { actionsFor, columnOf, isCaisseAction, newArrivals, parseFee, telLink } from "@/lib/caisse";
+import { actionsFor, cardFrom, columnOf, isCaisseAction, newArrivals, parseFee, telLink } from "@/lib/caisse";
 import type { CaisseOrder } from "@/lib/types";
 
 const order = (over: Partial<CaisseOrder> = {}): CaisseOrder => ({
@@ -67,7 +67,7 @@ describe("caisse · saisies", () => {
 
 describe("caisse · relais web", () => {
   it("liste blanche des actions relayées vers l'API", () => {
-    for (const a of ["accept", "status", "called", "pay", "refuse", "cancel"]) expect(isCaisseAction(a)).toBe(true);
+    for (const a of ["accept", "status", "called", "pay", "refuse", "cancel", "loyalty", "reward"]) expect(isCaisseAction(a)).toBe(true);
     for (const a of ["../staff", "delete", "", "accept/../../staff"]) expect(isCaisseAction(a)).toBe(false);
   });
 
@@ -81,5 +81,34 @@ describe("caisse · relais web", () => {
   it("la caisse ne range aucun jeton dans le navigateur", () => {
     const board = readFileSync("src/components/CaisseBoard.tsx", "utf8");
     expect(board).not.toMatch(/localStorage|sessionStorage|document\.cookie/);
+  });
+});
+
+describe("caisse · fidélité", () => {
+  it("tampon après l'encaissement, cadeau avant, une seule carte par commande", () => {
+    expect(kinds(order({ status: "acceptee" }), "caissier")).toContain("reward");
+    expect(kinds(order({ status: "acceptee" }), "caissier")).not.toContain("stamp");
+    expect(kinds(order({ status: "acceptee", paid_at: "x" }), "caissier")).toContain("stamp");
+    expect(kinds(order({ status: "acceptee", paid_at: "x", loyalty_card_id: 3 }), "caissier")).not.toContain("stamp");
+    expect(kinds(order({ status: "acceptee", discount_mru: 100 }), "caissier")).not.toContain("reward");
+    expect(kinds(order({ status: "annulee", paid_at: "x" }), "gerante")).toEqual([]);
+  });
+
+  it("numéro lu dans le QR ou saisi, mis en forme", () => {
+    expect(cardFrom("https://snacki.test/carte#FID-7KQ2-M9XA")).toBe("FID-7KQ2-M9XA");
+    expect(cardFrom("fid 7kq2 m9xa")).toBe("FID-7KQ2-M9XA");
+    expect(cardFrom("7KQ2M9XA")).toBe("FID-7KQ2-M9XA");
+    for (const bad of ["", "FID-123", "javascript:alert(1)", "<img src=x>"]) expect(cardFrom(bad)).toBeNull();
+  });
+
+  it("caméra permise sur la seule page de la caisse", () => {
+    const cfg = readFileSync("next.config.ts", "utf8");
+    expect(cfg).toMatch(/source: "\/caisse", headers: \[\{ key: "Permissions-Policy", value: "camera=\(self\)/);
+    expect(cfg).toMatch(/NO_DEVICES = "camera=\(\)/);
+  });
+
+  it("aucune image de la caméra n'est envoyée : lecture du QR dans le téléphone", () => {
+    const scanner = readFileSync("src/components/QrScanner.tsx", "utf8");
+    expect(scanner).not.toMatch(/fetch\(|XMLHttpRequest|toDataURL/);
   });
 });

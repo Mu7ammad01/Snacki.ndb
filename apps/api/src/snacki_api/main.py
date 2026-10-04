@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from snacki_api import auth, caisse, orders, pilotage, repository, staff
+from snacki_api import auth, caisse, loyalty, orders, pilotage, repository, staff
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
 from snacki_api.models import Category, StaffRole, StaffUser
@@ -30,6 +30,12 @@ from snacki_api.schemas import (
     CaisseOrderOut,
     CounterOrderIn,
     Health,
+    LoyaltyBlockIn,
+    LoyaltyCodeIn,
+    LoyaltyOut,
+    LoyaltyPhoneIn,
+    LoyaltyPublicOut,
+    LoyaltyTransferIn,
     MenuOut,
     OrderCreatedOut,
     OrderIn,
@@ -51,7 +57,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 ProductId = Annotated[str, Path(pattern=r"^[a-z][a-z-]{0,39}$")]
 
 # Réponses avec jeton, données de commande ou chiffres de vente : jamais en cache.
-NO_STORE = ("/v1/orders", "/v1/auth", "/v1/staff", "/v1/caisse", "/v1/pilotage")
+NO_STORE = ("/v1/orders", "/v1/auth", "/v1/staff", "/v1/caisse", "/v1/pilotage", "/v1/loyalty")
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -412,6 +418,88 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
         if start > end or (end - start).days >= pilotage.MAX_DAYS:
             raise HTTPException(status_code=422, detail="Période invalide (366 jours au plus)")
         return PilotageOut.model_validate(pilotage.summary(session, start, end))
+
+    # --- Fidélité (J8 bis) ------------------------------------------------------------------
+
+    def loyalty_act(session: Session, order_id: int, action) -> CaisseOrderOut:
+        """Comme act(), mais une carte inconnue ou refusée renvoie aussi 409 avec son motif."""
+
+        def run(order):
+            try:
+                action(order)
+            except loyalty.LoyaltyError as exc:
+                raise caisse.CaisseError(str(exc)) from None
+
+        return act(session, order_id, run)
+
+    @app.post(
+        "/v1/caisse/orders/{order_id}/loyalty", response_model=CaisseOrderOut, tags=["fidélité"]
+    )
+    def caisse_stamp(
+        order_id: OrderId, data: LoyaltyCodeIn, user: StaffDep, session: SessionDep
+    ) -> CaisseOrderOut:
+        """Tampon : la commande encaissée est liée à la carte (une fois)."""
+        return loyalty_act(
+            session, order_id, lambda o: loyalty.stamp(session, user, o, data.code, data.phone)
+        )
+
+    @app.post(
+        "/v1/caisse/orders/{order_id}/reward", response_model=CaisseOrderOut, tags=["fidélité"]
+    )
+    def caisse_reward(
+        order_id: OrderId, data: LoyaltyCodeIn, user: StaffDep, session: SessionDep
+    ) -> CaisseOrderOut:
+        """Cadeau : 100 MRU au plus retirés d'une commande pas encore encaissée."""
+        return loyalty_act(session, order_id, lambda o: loyalty.redeem(session, user, o, data.code))
+
+    def card_or_error(session: Session, text: str):
+        try:
+            return loyalty.find(session, text)
+        except loyalty.LoyaltyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from None
+
+    @app.post("/v1/caisse/loyalty", response_model=LoyaltyOut, tags=["fidélité"])
+    def caisse_card(
+        request: Request, data: LoyaltyCodeIn, _user: StaffDep, session: SessionDep
+    ) -> LoyaltyOut:
+        """État d'une carte pour la caisse (numéro dans le corps, jamais dans l'URL)."""
+        rate_limit("loyalty", request)
+        return LoyaltyOut(**loyalty.summary(card_or_error(session, data.code)))
+
+    @app.post("/v1/loyalty/status", response_model=LoyaltyPublicOut, tags=["fidélité"])
+    def card_public(request: Request, data: LoyaltyCodeIn, session: SessionDep) -> LoyaltyPublicOut:
+        """Le client suit sa carte (QR) : progression seulement, limite de débit (T28)."""
+        rate_limit("loyalty", request)
+        info = loyalty.summary(card_or_error(session, data.code))
+        return LoyaltyPublicOut(**{k: info[k] for k in LoyaltyPublicOut.model_fields})
+
+    def manager_card(session: Session, action) -> LoyaltyOut:
+        try:
+            card = action()
+        except loyalty.LoyaltyError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        session.commit()
+        return LoyaltyOut(**loyalty.summary(card))
+
+    @app.post("/v1/loyalty/block", response_model=LoyaltyOut, tags=["fidélité"])
+    def card_block(data: LoyaltyBlockIn, user: ManagerDep, session: SessionDep) -> LoyaltyOut:
+        """Carte perdue, volée ou suspecte : plus de tampon ni de cadeau (gérante, admin)."""
+        return manager_card(session, lambda: loyalty.block(session, user, data.code, data.reason))
+
+    @app.post("/v1/loyalty/transfer", response_model=LoyaltyOut, tags=["fidélité"])
+    def card_transfer(data: LoyaltyTransferIn, user: ManagerDep, session: SessionDep) -> LoyaltyOut:
+        """Carte perdue : tampons reportés sur une carte neuve (gérante, admin)."""
+        return manager_card(
+            session, lambda: loyalty.transfer(session, user, data.old_code, data.new_code)
+        )
+
+    @app.post("/v1/loyalty/search", response_model=list[LoyaltyOut], tags=["fidélité"])
+    def card_search(
+        data: LoyaltyPhoneIn, _user: ManagerDep, session: SessionDep
+    ) -> list[LoyaltyOut]:
+        """Retrouver la carte d'un client par son téléphone (gérante, admin)."""
+        return [LoyaltyOut(**loyalty.summary(c)) for c in loyalty.search_phone(session, data.phone)]
 
     return app
 

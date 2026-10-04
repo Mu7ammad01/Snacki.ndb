@@ -4,7 +4,7 @@ PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à No
 
 Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
 
-> État : **J8 / 15** · En ligne sur Cloud Run (staging puis production approuvée). Connexion du staff (J6), caisse (J7). Pilotage : chiffre d'affaires du jour, de la période et cumulé, produits les plus vendus, moyens de paiement, historique Excel importé ; coordonnées des clients anonymisées après 90 jours ([ADR 0010](docs/adr/0010-pilotage-et-historique.md)).
+> État : **J8 / 15** · En ligne sur Cloud Run (staging puis production approuvée). Connexion du staff (J6), caisse (J7). Pilotage : chiffre d'affaires du jour, de la période et cumulé, produits les plus vendus, moyens de paiement, historique Excel importé ; coordonnées des clients anonymisées après 90 jours ([ADR 0010](docs/adr/0010-pilotage-et-historique.md)). Fidélité : carte à QR unique, 5 achats = 1 commande offerte, tampons enregistrés dans l'app ([ADR 0011](docs/adr/0011-fidelite.md)).
 
 ## Architecture
 

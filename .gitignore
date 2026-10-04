@@ -45,3 +45,5 @@ Thumbs.db
 # Classeurs de suivi (chiffres du snack) : jamais dans le dépôt public
 *.xlsx
 *.xls
+# Étiquettes de cartes de fidélité : numéros valides, jamais dans le dépôt
+cartes-*.pdf

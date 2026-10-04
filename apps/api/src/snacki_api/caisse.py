@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from snacki_api import orders, staff
+from snacki_api import loyalty, orders, staff
 from snacki_api.models import (
     Fulfilment,
     Order,
@@ -129,6 +129,8 @@ def close(
     before = order.status
     order.status = target
     order.closed_reason = reason
+    if target == S.ANNULEE:
+        loyalty.on_cancel(session, actor, order)  # tampon retiré, ou tampons du cadeau rendus
     _log(
         session,
         actor,

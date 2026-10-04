@@ -137,6 +137,7 @@ class OrderTrackOut(BaseModel):
     lines: list[OrderLineOut]
     created_at: datetime
     ready_at: datetime | None = None  # heure de mise à disposition annoncée
+    discount_mru: int = 0  # cadeau fidélité
     closed_reason: str | None = None  # motif d'un refus ou d'une annulation
 
 
@@ -229,6 +230,7 @@ class CaisseOrderOut(OrderTrackOut):
     customer_called_at: datetime | None
     paid_method: PaymentMethod | None
     paid_at: datetime | None
+    loyalty_card_id: int | None = None
 
 
 class CaisseDayOut(BaseModel):
@@ -302,6 +304,13 @@ class PaymentPoint(BaseModel):
     amount_mru: int
 
 
+class LoyaltyStats(BaseModel):
+    stamps: int  # tampons donnés sur la période
+    rewards: int  # commandes offertes encaissées
+    discount_mru: int  # montant offert
+    active_cards: int  # cartes utilisées au moins une fois (total)
+
+
 class PilotageOut(BaseModel):
     start: date
     end: date
@@ -315,3 +324,71 @@ class PilotageOut(BaseModel):
     payments: list[PaymentPoint]
     history_first: date | None
     history_last: date | None
+    loyalty: LoyaltyStats
+
+
+# --- Fidélité (J8 bis) ---------------------------------------------------------------------
+
+CardText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=8, max_length=200, pattern=_NO_CONTROL)
+]
+
+
+class LoyaltyCodeIn(BaseModel):
+    """Numéro saisi ou lien lu dans le QR ; vérifié (format et contrôle) par l'API."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: CardText
+    phone: str | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        digits = re.sub(r"[\s.-]", "", value)
+        if not re.fullmatch(r"[234][0-9]{7}", digits):
+            raise ValueError("numéro mauritanien attendu : 8 chiffres commençant par 2, 3 ou 4")
+        return digits
+
+
+class LoyaltyBlockIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: CardText
+    reason: Reason
+
+
+class LoyaltyTransferIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    old_code: CardText
+    new_code: CardText
+
+
+class LoyaltyPhoneIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    phone: str = Field(pattern=r"^[234][0-9]{7}$")
+
+
+class LoyaltyOut(BaseModel):
+    card: str
+    status: str
+    stamps: int
+    progress: int
+    goal: int
+    rewards_available: int
+    rewards_taken: int
+    phone_linked: bool
+
+
+class LoyaltyPublicOut(BaseModel):
+    """Vue du client (QR de sa carte) : progression seulement, aucune donnée personnelle."""
+
+    card: str
+    status: str
+    progress: int
+    goal: int
+    rewards_available: int

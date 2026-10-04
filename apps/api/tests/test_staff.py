@@ -37,6 +37,7 @@ PUBLIC_ROUTES = {
     "/v1/orders/track",
     "/v1/auth/start",
     "/v1/auth/callback",
+    "/v1/loyalty/status",  # J8 bis : le client suit sa carte (progression seule, limite de débit)
 }
 
 

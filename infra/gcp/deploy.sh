@@ -89,6 +89,9 @@ echo "    caisse : fermée sans session"
 where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${WEB_URL}/pilotage")"
 [[ "$where" == 307*"/connexion" ]] || fail "le pilotage doit renvoyer vers la connexion (${where})"
 echo "    pilotage : fermé sans session"
+code="$(curl -s -o /dev/null -w '%{http_code}' "${WEB_URL}/carte")"
+[ "$code" = "200" ] || fail "page de suivi de carte : ${code}"
+echo "    carte de fidélité : page publique en ligne"
 
 echo "Version déployée en ${ENV} : ${WEB_URL}"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "web_url=${WEB_URL}" >>"$GITHUB_OUTPUT"; fi

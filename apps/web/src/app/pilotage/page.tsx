@@ -145,6 +145,16 @@ export default async function PilotagePage({
             <p className="muted">L&apos;historique Excel ne précise pas le moyen de paiement.</p>
           </section>
 
+          <section className="track">
+            <h2>Fidélité</h2>
+            <div className="kpis">
+              <div><span>Tampons donnés</span><b>{data.loyalty.stamps}</b></div>
+              <div><span>Commandes offertes</span><b>{data.loyalty.rewards}</b></div>
+              <div><span>Montant offert</span><b>{mru(data.loyalty.discount_mru)}</b></div>
+              <div><span>Cartes actives (total)</span><b>{data.loyalty.active_cards}</b></div>
+            </div>
+          </section>
+
           {data.history_first && (
             <p className="muted small-note">Historique importé : du {shortDay(data.history_first)} au {data.history_last && shortDay(data.history_last)}.</p>
           )}

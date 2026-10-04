@@ -1,8 +1,8 @@
 # Modèle de menaces de Snacki
 
-Version 9 · J8 (7 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
+Version 10 · J8 bis (5 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
-Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 27 menaces ci-dessous en découlent : 22 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7 et 2 à J8), les 5 autres ont leur jour de traitement dans le plan.
+Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 28 menaces ci-dessous en découlent : 23 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7, 2 à J8 et 1 à J8 bis), les 5 autres ont leur jour de traitement dans le plan.
 
 ## 1. Périmètre et hypothèses
 
@@ -53,6 +53,7 @@ Ce schéma est généré par `python3 scripts/render_dfd.py` à partir de [`thre
 | Jeton de suivi | Secret (capacité) | Base (empreinte SHA-256), fragment d'URL côté client | 24 h de validité |
 | E-mail Google du staff, rôle | Personnelle | Base, table `staff_user` | Tant que la personne travaille au snack |
 | Texte WhatsApp collé dans l'assistant | Personnelle avant masquage | Mémoire de l'API ; seule la version masquée est stockée | Version masquée : 30 jours |
+| Carte de fidélité : numéro, tampons, téléphone facultatif | Personnelle (téléphone) | Base, tables `loyalty_card` et `loyalty_event` | Téléphone effacé après 1 an sans achat ; tampons gardés |
 | Journal d'audit | Interne | Base, table `audit_log` | 1 an, puis supprimé à chaque déploiement (J8) |
 | Journaux techniques | Interne | Cloud Logging | 30 jours, sans donnée personnelle |
 | Secrets | Secret | Secret Manager, GitHub Secrets | Rotation au moindre doute, sinon tous les 6 mois |
@@ -126,6 +127,7 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T25 | Flux 1 | S | Fausse commande de livraison passée avec le numéro d'un tiers, maintenant que WhatsApp ne confirme plus l'identité du client | 2 × 2 | moyen | Commande « reçue » à accepter par le staff, avec délai et frais ; numéro cliquable dans la caisse ; livraison impossible à marquer « remise » sans appel au client (409) ; refus motivé par la gérante ; limite de débit (T04) | V2.3.1 | J7 | **fait** (ADR 0009) |
 | T26 | Flux 9 | I | Un caissier, ou quiconque sans session, lit le chiffre d'affaires et les ventes du snack | 2 × 2 | moyen | `GET /v1/pilotage` réservé à la gérante et à l'admin (`require_role`, refus journalisé) ; page `/pilotage` fermée sans session (contrôle au déploiement) ; réponses `no-store` | V8.2.1 | J8 | **fait** (ADR 0010) |
 | T27 | Import | T | Classeur Excel piégé (bombe XML, entité externe, formule) qui fait planter ou détourne l'import | 1 × 2 | faible | Script d'administration, jamais un téléversement web ; .xlsx de 5 Mo au plus ; defusedxml ; valeurs lues sans formule ; feuille « Ventes » seule ; textes nettoyés et bornés ; essai à blanc avant d'écrire | V1.5.1 | J8 | **fait** (ADR 0010) |
+| T28 | Fidélité | T | Fraude à la carte : faux numéro, tampons fabriqués, cadeau pris deux fois, carte copiée, caissier complice | 2 × 2 | moyen | Numéro aléatoire + contrôle, cartes émises seulement ; tampon par le staff après encaissement, une fois par commande (unicité en base), 3 par jour, 10 min d'écart ; cadeau plafonné à 100 MRU, carte verrouillée ; annulation = tampon retiré ; blocage et transfert par la gérante ; grand livre et pilotage ; suivi public sans donnée personnelle, limite de débit | V2.3.1 | J8 bis | **fait** (ADR 0011) |
 
 ## 8. Cas d'abus (tests à écrire)
 
@@ -143,6 +145,8 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 10. Une vente au comptoir envoie `unit_price_mru` ou `total_mru` : 422, le total vient de la base (T01).
 11. Un caissier appelle `GET /v1/pilotage` : 403 et une ligne `access_denied` au journal (T26).
 12. Une période forgée (`start=2026-09-01'; DROP TABLE orders; --`) : 422, la requête n'atteint pas la base (T05).
+13. Un même numéro de carte tamponné deux fois pour une commande, ou 4 fois dans la journée : 409 (T28).
+14. Le cadeau demandé depuis deux caisses en même temps : un seul passe (verrou de la carte) (T28).
 
 ## 9. Décisions prises grâce à cette analyse
 
@@ -181,3 +185,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 05/10/2026 | 7 | J6 : T07, T08, T09, T10 et T12 traitées (connexion Google avec PKCE, sessions révocables, rôles, CSRF) ; journal d'audit créé (T11 en cours) |
 | 06/10/2026 | 8 | J7 : T11 traitée (journal des actions de caisse) ; T04 et T06 complétées ; nouvelle menace T25 (fausse commande sans WhatsApp) traitée ; risque « faux message WhatsApp » retiré, la commande ne passe plus par WhatsApp |
 | 07/10/2026 | 9 | J8 : T26 (pilotage réservé) et T27 (import Excel) traitées ; conservation appliquée (coordonnées 90 jours, journal 1 an) ; historique ajouté à l'inventaire des données |
+| 05/10/2026 | 10 | J8 bis : T28 (fraude à la fidélité) traitée ; carte et téléphone facultatif ajoutés à l'inventaire des données |
