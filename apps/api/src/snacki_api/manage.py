@@ -15,7 +15,7 @@ import-history (ADR 0010) : lit la feuille « Ventes » du classeur de suivi et 
 l'historique des jours qu'il contient. --dry-run affiche le rapport sans rien écrire.
 
 loyalty-cards (ADR 0011) : crée des cartes de fidélité neuves (un lot) et les écrit dans un PDF
-prêt à imprimer (--layout cartes : cartes complètes ; etiquettes : planches à coller) ;
+prêt à imprimer (--layout cartes : 2 cartes par A4 ; cartes4 : 4 par A4 ; etiquettes : planches) ;
 --reprint réimprime un lot existant.
 """
 
@@ -101,8 +101,11 @@ def loyalty_cards(
             batch = "L" + hashlib.sha256(now.encode()).hexdigest()[:9].upper()
             codes = loyalty.issue(session, count, batch)
     try:
-        write = loyalty_print.write_cards if layout == "cartes" else loyalty_print.write_labels
-        pages = write(codes, base_url, out)
+        if layout == "etiquettes":
+            pages = loyalty_print.write_labels(codes, base_url, out)
+        else:
+            per_page = 4 if layout == "cartes4" else 2
+            pages = loyalty_print.write_cards(codes, base_url, out, per_page=per_page)
     except ValueError as exc:
         raise history.HistoryError(str(exc)) from None
     print(f"Lot {batch} : {len(codes)} cartes, {pages} page(s) A4 ({layout}) dans {out}.")
@@ -124,7 +127,7 @@ def main(argv: list[str]) -> int:
     cards.add_argument("--reprint", default=None)
     cards.add_argument("--base-url", required=True)
     cards.add_argument("--out", type=Path, required=True)
-    cards.add_argument("--layout", choices=("cartes", "etiquettes"), default="cartes")
+    cards.add_argument("--layout", choices=("cartes", "cartes4", "etiquettes"), default="cartes")
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
