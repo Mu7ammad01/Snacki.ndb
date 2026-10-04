@@ -37,6 +37,7 @@ export interface OrderTrack {
   lines: OrderLine[];
   created_at: string;
   ready_at: string | null;
+  discount_mru?: number; // cadeau fidélité (J8 bis)
   closed_reason: string | null;
 }
 
@@ -53,6 +54,7 @@ export interface CaisseOrder extends OrderTrack {
   customer_called_at: string | null;
   paid_method: PaymentMethod | null;
   paid_at: string | null;
+  loyalty_card_id?: number | null;
 }
 
 export interface OrderCreated extends OrderTrack {
@@ -85,4 +87,20 @@ export interface Pilotage {
   payments: { method: PaymentMethod; count: number; amount_mru: number }[];
   history_first: string | null;
   history_last: string | null;
+  loyalty: { stamps: number; rewards: number; discount_mru: number; active_cards: number };
 }
+
+/** Fidélité (J8 bis) : état d'une carte vu par la caisse. */
+export interface LoyaltyCard {
+  card: string;
+  status: "issued" | "active" | "blocked";
+  stamps: number;
+  progress: number;
+  goal: number;
+  rewards_available: number;
+  rewards_taken: number;
+  phone_linked: boolean;
+}
+
+/** Vue du client (QR de sa carte) : progression seulement. */
+export type LoyaltyPublic = Pick<LoyaltyCard, "card" | "status" | "progress" | "goal" | "rewards_available">;

@@ -42,4 +42,5 @@ DEFAULT_RULES = {
     "order_create": [(5, 60), (20, 3600)],  # 5 commandes par minute, 20 par heure
     "order_track": [(60, 60)],  # le suivi interroge régulièrement : 1 par seconde
     "auth": [(10, 60), (30, 3600)],  # connexions du staff : freine le bourrage d'essais
+    "loyalty": [(20, 60), (200, 3600)],  # cartes : freine qui essaie des numéros au hasard
 }

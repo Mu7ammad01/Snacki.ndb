@@ -3,6 +3,8 @@
     python -m snacki_api.manage migrate                 # job de chaque déploiement (J6, J8)
     python -m snacki_api.manage purge                   # conservation des données (J8)
     python -m snacki_api.manage import-history FICHIER.xlsx [--dry-run] [--divisor 10]
+    python -m snacki_api.manage loyalty-cards --count 44 --base-url https://… --out cartes.pdf
+    python -m snacki_api.manage loyalty-cards --reprint LOT --base-url https://… --out cartes.pdf
 
 migrate :
 1. applique les migrations Alembic (`upgrade head`) ;
@@ -11,19 +13,27 @@ migrate :
 
 import-history (ADR 0010) : lit la feuille « Ventes » du classeur de suivi et remplace
 l'historique des jours qu'il contient. --dry-run affiche le rapport sans rien écrire.
+
+loyalty-cards (ADR 0011) : crée des cartes de fidélité neuves (un lot) et les écrit dans un PDF
+prêt à imprimer (--layout cartes : cartes complètes ; etiquettes : planches à coller) ;
+--reprint réimprime un lot existant.
 """
 
 import argparse
+import hashlib
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import select
 
-from snacki_api import history, retention, staff
+from snacki_api import history, loyalty, loyalty_print, retention, staff
 from snacki_api.config import get_settings
 from snacki_api.db import get_sessionmaker
+from snacki_api.models import LoyaltyCard
 
 API_DIR = Path(__file__).resolve().parents[2]
 
@@ -69,6 +79,36 @@ def import_history(path: Path, divisor: int, dry_run: bool) -> None:
     print(f"Importé : {report.sales} ventes sur {report.days} jours.")
 
 
+def loyalty_cards(
+    count: int, reprint: str | None, base_url: str, out: Path, layout: str = "cartes"
+) -> None:
+    if out.suffix.lower() != ".pdf":
+        raise history.HistoryError("Fichier .pdf attendu pour les étiquettes")
+    with get_sessionmaker()() as session:
+        if reprint:
+            codes = list(
+                session.scalars(
+                    select(LoyaltyCard.code)
+                    .where(LoyaltyCard.batch == reprint)
+                    .order_by(LoyaltyCard.id)
+                )
+            )
+            if not codes:
+                raise history.HistoryError(f"Lot {reprint} introuvable")
+            batch = reprint
+        else:
+            now = datetime.now(UTC).isoformat()
+            batch = "L" + hashlib.sha256(now.encode()).hexdigest()[:9].upper()
+            codes = loyalty.issue(session, count, batch)
+    try:
+        write = loyalty_print.write_cards if layout == "cartes" else loyalty_print.write_labels
+        pages = write(codes, base_url, out)
+    except ValueError as exc:
+        raise history.HistoryError(str(exc)) from None
+    print(f"Lot {batch} : {len(codes)} cartes, {pages} page(s) A4 ({layout}) dans {out}.")
+    print("Imprimez, puis supprimez ce fichier : il contient des numéros valides.")
+
+
 def main(argv: list[str]) -> int:
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(prog="python -m snacki_api.manage")
@@ -79,6 +119,12 @@ def main(argv: list[str]) -> int:
     imp.add_argument("file", type=Path)
     imp.add_argument("--divisor", type=int, default=10, choices=(1, 10))
     imp.add_argument("--dry-run", action="store_true")
+    cards = sub.add_parser("loyalty-cards")
+    cards.add_argument("--count", type=int, default=44, choices=range(1, 1001), metavar="1-1000")
+    cards.add_argument("--reprint", default=None)
+    cards.add_argument("--base-url", required=True)
+    cards.add_argument("--out", type=Path, required=True)
+    cards.add_argument("--layout", choices=("cartes", "etiquettes"), default="cartes")
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
@@ -88,9 +134,11 @@ def main(argv: list[str]) -> int:
             migrate()
         elif args.cmd == "purge":
             purge()
+        elif args.cmd == "loyalty-cards":
+            loyalty_cards(args.count, args.reprint, args.base_url, args.out, args.layout)
         else:
             import_history(args.file, args.divisor, args.dry_run)
-    except history.HistoryError as exc:
+    except (history.HistoryError, FileNotFoundError) as exc:
         print(f"Refusé : {exc}", file=sys.stderr)
         return 1
     return 0

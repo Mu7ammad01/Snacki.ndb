@@ -62,13 +62,14 @@ export default function TrackView() {
             {order.ready_at && !["livree", "refusee", "annulee"].includes(order.status) && (
               <p className="alert">{t.readyAt(hhmm(order.ready_at))}</p>
             )}
-            {order.delivery_fee_mru > 0 && (
+            {(order.delivery_fee_mru > 0 || (order.discount_mru ?? 0) > 0) && (
               <>
                 <div className="sum"><span>{t.articles}</span><span>{fmt(order.total_mru)} MRU</span></div>
-                <div className="sum"><span>{t.fee}</span><span>{fmt(order.delivery_fee_mru)} MRU</span></div>
+                {order.delivery_fee_mru > 0 && <div className="sum"><span>{t.fee}</span><span>{fmt(order.delivery_fee_mru)} MRU</span></div>}
+                {(order.discount_mru ?? 0) > 0 && <div className="sum"><span>{t.gift}</span><span>− {fmt(order.discount_mru ?? 0)} MRU</span></div>}
               </>
             )}
-            <div className="sum big"><span>{order.delivery_fee_mru > 0 ? t.toPay : t.total}</span><span>{fmt(order.grand_total_mru)} MRU</span></div>
+            <div className="sum big"><span>{order.delivery_fee_mru > 0 || (order.discount_mru ?? 0) > 0 ? t.toPay : t.total}</span><span>{fmt(order.grand_total_mru)} MRU</span></div>
             <p className="muted gap10">{t.trackRefresh}</p>
           </>
         )}

@@ -13,7 +13,9 @@ export type Action =
   | { kind: "called" }
   | { kind: "pay" }
   | { kind: "refuse" }
-  | { kind: "cancel" };
+  | { kind: "cancel" }
+  | { kind: "stamp" }
+  | { kind: "reward" };
 
 const NEXT: Partial<Record<OrderStatus, { to: OrderStatus; label: string }>> = {
   acceptee: { to: "en_preparation", label: "En préparation" },
@@ -61,6 +63,10 @@ export function actionsFor(order: CaisseOrder, role: Role): Action[] {
     out.push({ kind: "called" });
   }
   if (!order.paid_at && !["refusee", "annulee"].includes(order.status)) out.push({ kind: "pay" });
+  // Fidélité : tampon après l'encaissement, cadeau avant ; une seule carte par commande.
+  const noCard = !order.loyalty_card_id && !order.discount_mru;
+  if (noCard && order.paid_at && !["refusee", "annulee"].includes(order.status)) out.push({ kind: "stamp" });
+  if (noCard && !order.paid_at && OPEN.includes(order.status)) out.push({ kind: "reward" });
   if (manager && OPEN.includes(order.status)) out.push({ kind: "cancel" });
   return out;
 }
@@ -94,9 +100,19 @@ export const hhmm = (iso: string | null) =>
     ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })
     : "";
 
-const ACTIONS = new Set(["accept", "status", "called", "pay", "refuse", "cancel"]);
+const ACTIONS = new Set(["accept", "status", "called", "pay", "refuse", "cancel", "loyalty", "reward"]);
 
 /** Action relayée par le web : liste blanche, aucune autre route de l'API n'est atteignable. */
 export function isCaisseAction(value: string): boolean {
   return ACTIONS.has(value);
+}
+
+const CARD = /FID[-\s]*([0-9A-Z]{4})[-\s]*([0-9A-Z]{4})/i;
+
+/** Numéro de carte lu dans le QR (lien …/carte#FID-…) ou saisi ; mise en forme seulement,
+ * la vérification (caractère de contrôle, existence) est faite par l'API. */
+export function cardFrom(text: string): string | null {
+  const m = CARD.exec(text.toUpperCase());
+  const raw = m ? m[1] + m[2] : text.toUpperCase().replace(/[\s-]/g, "");
+  return /^[0-9A-Z]{8}$/.test(raw) ? `FID-${raw.slice(0, 4)}-${raw.slice(4)}` : null;
 }

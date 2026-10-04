@@ -2,7 +2,8 @@
 
 - coordonnées des clients (prénom, téléphone, repère, remarque) : effacées 90 jours après la
   commande ; les montants, produits et dates restent pour le pilotage ;
-- journal d'audit : 1 an.
+- journal d'audit : 1 an ;
+- téléphone lié à une carte de fidélité : effacé après 1 an sans tampon (la carte reste).
 
 Lancé à chaque déploiement par le job de migration (`python -m snacki_api.manage migrate`)
 et à la demande (`python -m snacki_api.manage purge`).
@@ -15,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import case, delete, update
 from sqlalchemy.orm import Session
 
-from snacki_api.models import AuditLog, Order, OrderStatus
+from snacki_api.models import AuditLog, LoyaltyCard, Order, OrderStatus
 
 AUDIT_DAYS = 365
 CLOSED = (OrderStatus.LIVREE, OrderStatus.REFUSEE, OrderStatus.ANNULEE)
@@ -44,5 +45,13 @@ def purge(session: Session, retention_days: int, now: datetime | None = None) ->
     audit = session.execute(
         delete(AuditLog).where(AuditLog.at < now - timedelta(days=AUDIT_DAYS))
     ).rowcount
+    session.execute(
+        update(LoyaltyCard)
+        .where(
+            LoyaltyCard.phone.is_not(None),
+            LoyaltyCard.last_stamp_at < now - timedelta(days=AUDIT_DAYS),
+        )
+        .values(phone=None)
+    )
     session.commit()
     return orders, audit

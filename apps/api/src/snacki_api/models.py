@@ -1,4 +1,4 @@
-"""Tables de la base. J2 : catalogue. J3 : commandes. J6 : staff et journal. J8 : historique."""
+"""Tables de la base : catalogue (J2), commandes (J3), staff (J6), historique et fidélité (J8)."""
 
 import enum
 from datetime import date, datetime
@@ -103,6 +103,9 @@ class Order(Base):
         ),
         CheckConstraint("delivery_fee_mru BETWEEN 0 AND 2000", name="delivery_fee_range"),
         CheckConstraint(
+            "discount_mru BETWEEN 0 AND 100 AND discount_mru <= total_mru", name="discount_range"
+        ),
+        CheckConstraint(
             "fulfilment = 'emporter' OR landmark IS NOT NULL", name="landmark_if_delivery"
         ),
     )
@@ -141,6 +144,9 @@ class Order(Base):
     closed_reason: Mapped[str | None] = mapped_column(String(160))
     # --- Conservation (J8) : coordonnées effacées après 90 jours, montants conservés ---
     anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # --- Fidélité (J8 bis) : carte liée à la commande, remise du cadeau (100 MRU au plus) ---
+    loyalty_card_id: Mapped[int | None] = mapped_column(ForeignKey("loyalty_card.id"), index=True)
+    discount_mru: Mapped[int] = mapped_column(default=0, server_default="0")
 
     lines: Mapped[list["OrderLine"]] = relationship(
         back_populates="order", cascade="all, delete-orphan", order_by="OrderLine.id"
@@ -148,8 +154,8 @@ class Order(Base):
 
     @property
     def grand_total_mru(self) -> int:
-        """À payer : articles (prix figés) + frais de livraison fixés par le staff."""
-        return self.total_mru + self.delivery_fee_mru
+        """À payer : articles (prix figés) + frais de livraison − cadeau fidélité."""
+        return self.total_mru + self.delivery_fee_mru - self.discount_mru
 
     @property
     def number(self) -> str:
@@ -259,3 +265,59 @@ class HistoryItem(Base):
     quantity: Mapped[int]
 
     sale: Mapped[HistorySale] = relationship(back_populates="items")
+
+
+class CardStatus(enum.StrEnum):
+    ISSUED = "issued"  # imprimée, jamais utilisée
+    ACTIVE = "active"
+    BLOCKED = "blocked"  # perdue, volée ou fraude : plus aucun tampon ni cadeau
+
+
+class LoyaltyCard(Base):
+    """Carte de fidélité. Seules les cartes émises par Snacki existent en base."""
+
+    __tablename__ = "loyalty_card"
+    __table_args__ = (
+        CheckConstraint("code ~ '^[0-9A-HJKMNP-TV-Z]{8}$'", name="card_code_format"),
+        CheckConstraint("stamps BETWEEN 0 AND 100", name="card_stamps_range"),
+        CheckConstraint("phone IS NULL OR phone ~ '^[234][0-9]{7}$'", name="card_phone_mr"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(8), unique=True)  # 7 caractères aléatoires + contrôle
+    status: Mapped[CardStatus] = mapped_column(
+        _enum(CardStatus, "card_status"), default=CardStatus.ISSUED
+    )
+    stamps: Mapped[int] = mapped_column(default=0, server_default="0")
+    rewards: Mapped[int] = mapped_column(default=0, server_default="0")
+    phone: Mapped[str | None] = mapped_column(String(8), index=True)  # facultatif
+    batch: Mapped[str] = mapped_column(String(16))
+    blocked_reason: Mapped[str | None] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_stamp_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LoyaltyKind(enum.StrEnum):
+    STAMP = "stamp"
+    REVOKE = "revoke"  # commande annulée après le tampon
+    REWARD = "reward"
+    RESTORE = "restore"  # commande offerte annulée : les tampons reviennent
+    TRANSFER = "transfer"  # carte perdue : tampons reportés sur une nouvelle carte
+
+
+class LoyaltyEvent(Base):
+    """Grand livre de la carte : chaque mouvement de tampons, son auteur et sa commande."""
+
+    __tablename__ = "loyalty_event"
+    __table_args__ = (
+        # Une commande ne donne qu'un tampon et ne paie qu'un cadeau, même en cas de double clic.
+        UniqueConstraint("order_id", "kind", name="uq_loyalty_order_kind"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("loyalty_card.id"), index=True)
+    kind: Mapped[LoyaltyKind] = mapped_column(_enum(LoyaltyKind, "loyalty_kind"))
+    delta: Mapped[int]
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

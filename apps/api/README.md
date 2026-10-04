@@ -60,6 +60,19 @@ SNACKI_DATABASE_URL="$(gcloud secrets versions access latest --secret=snacki-db-
 
 Relancer le même fichier ne double rien : les jours qu'il contient sont remplacés.
 
+## Cartes de fidélité (J8 bis, ADR 0011)
+
+Créer un lot de cartes prêtes à imprimer (cartes complètes avec QR, 2 par page A4 ;
+`--layout etiquettes` pour des planches de 44 étiquettes 48,5 × 25,4 mm) :
+
+```bash
+SNACKI_DATABASE_URL="$(gcloud secrets versions access latest --secret=snacki-db-url-prod)" \
+  PYTHONPATH=src python -m snacki_api.manage loyalty-cards --count 44 \
+  --base-url https://snacki-web-prod-57h4g6dvma-uc.a.run.app --out ../../cartes-lot1.pdf
+```
+
+Imprimer, puis supprimer le PDF (il contient des numéros valides). `--reprint LOT` réimprime un lot.
+
 ## Organisation
 
 ```
@@ -75,7 +88,8 @@ src/snacki_api/
   pilotage.py    chiffre d'affaires, top produits, paiements (J8)
   history.py     lecture et import de l'historique Excel (J8)
   retention.py   conservation : anonymisation à 90 jours, journal 1 an (J8)
-  manage.py      migrate, purge, import-history
+  loyalty.py     fidélité : numéros, tampons, cadeau, blocage, transfert (J8 bis)
+  manage.py      migrate, purge, import-history, loyalty-cards
   main.py        application, routes, en-têtes de sécurité, erreurs sans fuite
 migrations/      Alembic : 0001 à 0007 (menu, commandes, staff, caisse, historique)
 tests/           tests sur PostgreSQL : menu, commandes, staff, caisse, pilotage, historique, sécurité

@@ -19,6 +19,9 @@ from sqlalchemy.orm import Session
 from snacki_api.models import (
     HistoryItem,
     HistorySale,
+    LoyaltyCard,
+    LoyaltyEvent,
+    LoyaltyKind,
     Order,
     OrderLine,
     OrderSource,
@@ -46,7 +49,7 @@ def _live(session: Session, start: date, end: date):
             paid.c.service_day,
             paid.c.source,
             func.count(),
-            func.sum(paid.c.total_mru + paid.c.delivery_fee_mru),
+            func.sum(paid.c.total_mru + paid.c.delivery_fee_mru - paid.c.discount_mru),
         ).group_by(paid.c.service_day, paid.c.source)
     ).all()
 
@@ -102,7 +105,7 @@ def _payments(session: Session, start: date, end: date) -> list[dict]:
         select(
             paid.c.paid_method,
             func.count(),
-            func.sum(paid.c.total_mru + paid.c.delivery_fee_mru),
+            func.sum(paid.c.total_mru + paid.c.delivery_fee_mru - paid.c.discount_mru),
         ).group_by(paid.c.paid_method)
     ).all()
     return sorted(
@@ -111,9 +114,40 @@ def _payments(session: Session, start: date, end: date) -> list[dict]:
     )
 
 
+def _loyalty(session: Session, start: date, end: date) -> dict:
+    paid = paid_orders(start, end).subquery()
+    rewards, discount = session.execute(
+        select(func.count(), func.coalesce(func.sum(paid.c.discount_mru), 0)).where(
+            paid.c.discount_mru > 0
+        )
+    ).one()
+    stamps = session.scalar(
+        select(func.count())
+        .select_from(LoyaltyEvent)
+        .where(
+            LoyaltyEvent.kind == LoyaltyKind.STAMP,
+            func.date(LoyaltyEvent.at).between(start, end),
+        )
+    )
+    active = session.scalar(
+        select(func.count()).select_from(LoyaltyCard).where(LoyaltyCard.last_stamp_at.is_not(None))
+    )
+    return {
+        "stamps": int(stamps or 0),
+        "rewards": int(rewards),
+        "discount_mru": int(discount),
+        "active_cards": int(active or 0),
+    }
+
+
 def all_time(session: Session) -> int:
     paid = paid_orders(date(2000, 1, 1), date(2999, 12, 31)).subquery()
-    live = session.scalar(select(func.sum(paid.c.total_mru + paid.c.delivery_fee_mru))) or 0
+    live = (
+        session.scalar(
+            select(func.sum(paid.c.total_mru + paid.c.delivery_fee_mru - paid.c.discount_mru))
+        )
+        or 0
+    )
     old = session.scalar(select(func.sum(HistorySale.total_mru))) or 0
     return int(live) + int(old)
 
@@ -156,6 +190,7 @@ def summary(session: Session, start: date, end: date) -> dict:
         "payments": _payments(session, start, end),
         "history_first": first,
         "history_last": last,
+        "loyalty": _loyalty(session, start, end),
     }
 
 

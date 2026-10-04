@@ -7,6 +7,7 @@ import {
   PAY_LABEL,
   STATUS_LABEL,
   actionsFor,
+  cardFrom,
   columnOf,
   hhmm,
   newArrivals,
@@ -14,12 +15,13 @@ import {
   telLink,
   type Column,
 } from "@/lib/caisse";
+import QrScanner, { canScan } from "@/components/QrScanner";
 import type { StaffMe } from "@/lib/staff";
-import type { CaisseOrder, PaymentMethod, Product } from "@/lib/types";
+import type { CaisseOrder, LoyaltyCard, PaymentMethod, Product } from "@/lib/types";
 
 const REFRESH_MS = 5_000;
 const PAYS = Object.keys(PAY_LABEL) as PaymentMethod[];
-type Panel = null | { id: number; mode: "accept" | "refuse" | "cancel" | "pay" };
+type Panel = null | { id: number; mode: "accept" | "refuse" | "cancel" | "pay" | "stamp" | "reward" };
 
 /** Bip court généré par le navigateur (aucun fichier son à charger). */
 function beep(ctx: AudioContext | null) {
@@ -42,6 +44,7 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
   const [busy, setBusy] = useState(false);
   const [alerts, setAlerts] = useState(false);
   const [counter, setCounter] = useState(false);
+  const [fidelity, setFidelity] = useState(false);
   const known = useRef<Set<number> | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const names = new Map(products.map((p) => [p.id, p.name_fr]));
@@ -124,12 +127,14 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
         <div className="caisse-tools">
           {!alerts && <button type="button" className="ghost" onClick={enableAlerts}>Activer son et notifications</button>}
           <button type="button" className="primary" onClick={() => setCounter((v) => !v)}>Vente au comptoir</button>
+          <button type="button" className="ghost" onClick={() => setFidelity((v) => !v)}>Carte fidélité</button>
         </div>
         <p className="muted">Encaissé aujourd&apos;hui : <b>{cashToday} MRU</b></p>
       </div>
 
       {msg && <p className={msg.bad ? "alert bad" : "alert"} role="status">{msg.text}</p>}
       {counter && <CounterForm products={products} busy={busy} onSubmit={async (b) => { if (await post("/api/caisse/orders", b)) setCounter(false); }} />}
+      {fidelity && <FidelityTool manager={me.role !== "caissier"} />}
       {shown.length === 0 && <p className="muted">Aucune commande ici pour l&apos;instant.</p>}
 
       <ul className="orders">
@@ -153,6 +158,8 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
                 {o.ready_at && <span>Prête vers {hhmm(o.ready_at)}</span>}
                 {o.customer_called_at && <span>Client appelé à {hhmm(o.customer_called_at)}</span>}
                 {o.closed_reason && <span>Motif : {o.closed_reason}</span>}
+                {(o.discount_mru ?? 0) > 0 && <span><b>Cadeau fidélité : − {o.discount_mru} MRU</b></span>}
+                {o.loyalty_card_id && !o.discount_mru && <span>Tampon fidélité donné</span>}
                 <span>
                   Total <b>{o.grand_total_mru} MRU</b>
                   {o.delivery_fee_mru > 0 ? ` (dont livraison ${o.delivery_fee_mru})` : ""}
@@ -169,6 +176,8 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
                     case "pay": return <button key="pay" className="ghost" disabled={busy} onClick={() => setPanel({ id: o.id, mode: "pay" })}>Encaisser</button>;
                     case "refuse": return <button key="refuse" className="ghost danger" disabled={busy} onClick={() => setPanel({ id: o.id, mode: "refuse" })}>Refuser</button>;
                     case "cancel": return <button key="cancel" className="ghost danger" disabled={busy} onClick={() => setPanel({ id: o.id, mode: "cancel" })}>Annuler</button>;
+                    case "stamp": return <button key="stamp" className="ghost" disabled={busy} onClick={() => setPanel({ id: o.id, mode: "stamp" })}>Tampon fidélité</button>;
+                    case "reward": return <button key="reward" className="ghost" disabled={busy} onClick={() => setPanel({ id: o.id, mode: "reward" })}>Cadeau fidélité</button>;
                   }
                 })}
               </div>
@@ -178,6 +187,10 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
                 <div className="chips">
                   {PAYS.map((m) => <button key={m} className="opt" disabled={busy} onClick={() => act(o, "pay", { method: m })}>{PAY_LABEL[m]}</button>)}
                 </div>
+              )}
+              {panel?.id === o.id && (panel.mode === "stamp" || panel.mode === "reward") && (
+                <CardForm withPhone={panel.mode === "stamp"} label={panel.mode === "stamp" ? "Donner le tampon" : "Offrir (100 MRU au plus)"} busy={busy}
+                  onSubmit={(b) => act(o, panel.mode === "stamp" ? "loyalty" : "reward", b)} />
               )}
               {panel?.id === o.id && (panel.mode === "refuse" || panel.mode === "cancel") && (
                 <ReasonForm label={panel.mode === "refuse" ? "Refuser" : "Annuler"} busy={busy} onSubmit={(reason) => act(o, panel.mode, { reason })} />
@@ -263,5 +276,94 @@ function CounterForm({ products, busy, onSubmit }: { products: Product[]; busy: 
       </div>
       <button className="primary" type="submit" disabled={busy || items.length === 0}>Enregistrer · ≈ {estimate} MRU</button>
     </form>
+  );
+}
+
+/** Numéro de carte : lu par la caméra (QR) ou saisi ; téléphone facultatif au premier tampon. */
+function CardForm({ withPhone, label, busy, onSubmit }: { withPhone: boolean; label: string; busy: boolean; onSubmit: (b: object) => void }) {
+  const [code, setCode] = useState("");
+  const [phone, setPhone] = useState("");
+  const [scan, setScan] = useState(false);
+  const card = cardFrom(code);
+  return (
+    <form className="panel" onSubmit={(e) => { e.preventDefault(); if (card) onSubmit(withPhone && phone ? { code: card, phone } : { code: card }); }}>
+      {scan && <QrScanner onRead={setCode} onClose={() => setScan(false)} />}
+      <div className="field">
+        <label>Numéro de la carte</label>
+        <input value={code} maxLength={40} autoCapitalize="characters" placeholder="FID-XXXX-XXXX" onChange={(e) => setCode(e.target.value)} />
+      </div>
+      {canScan() && !scan && <button type="button" className="ghost" onClick={() => setScan(true)}>Scanner le QR</button>}
+      {withPhone && (
+        <div className="field">
+          <label>Téléphone du client (facultatif, pour retrouver une carte perdue)</label>
+          <input value={phone} inputMode="tel" maxLength={12} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+      )}
+      <button className="primary" type="submit" disabled={busy || !card}>{label}</button>
+    </form>
+  );
+}
+
+/** Outil fidélité : état d'une carte ; gérante et admin : bloquer, remplacer, retrouver. */
+function FidelityTool({ manager }: { manager: boolean }) {
+  const [code, setCode] = useState("");
+  const [scan, setScan] = useState(false);
+  const [info, setInfo] = useState<LoyaltyCard[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [newCode, setNewCode] = useState("");
+  const [phone, setPhone] = useState("");
+  const card = cardFrom(code);
+
+  async function call(url: string, body: object) {
+    setMsg(null);
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = (await r.json().catch(() => ({}))) as { detail?: unknown };
+      if (!r.ok) { setMsg(typeof data.detail === "string" ? data.detail : "Action refusée"); return; }
+      setInfo(Array.isArray(data) ? (data as LoyaltyCard[]) : [data as LoyaltyCard]);
+    } catch {
+      setMsg("Service momentanément indisponible");
+    }
+  }
+
+  return (
+    <section className="track panel">
+      <h2>Carte fidélité</h2>
+      {scan && <QrScanner onRead={setCode} onClose={() => setScan(false)} />}
+      <div className="field">
+        <label>Numéro de la carte</label>
+        <input value={code} maxLength={40} placeholder="FID-XXXX-XXXX" onChange={(e) => setCode(e.target.value)} />
+      </div>
+      <div className="caisse-tools">
+        {canScan() && <button type="button" className="ghost" onClick={() => setScan(true)}>Scanner le QR</button>}
+        <button type="button" className="primary" disabled={!card} onClick={() => card && call("/api/caisse/loyalty", { code: card })}>Voir la carte</button>
+      </div>
+      {msg && <p className="alert bad" role="status">{msg}</p>}
+      {info?.map((c) => (
+        <p key={c.card} className="alert">
+          <b>{c.card}</b> · {c.status === "blocked" ? "BLOQUÉE" : `${c.progress}/${c.goal} tampons`} · cadeau(x) disponible(s) : {c.rewards_available} · déjà offerts : {c.rewards_taken}{c.phone_linked ? " · téléphone enregistré" : ""}
+        </p>
+      ))}
+      {manager && (
+        <>
+          <div className="field">
+            <label>Motif du blocage (carte perdue, volée, suspecte)</label>
+            <input value={reason} maxLength={160} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          <button type="button" className="ghost danger" disabled={!card || reason.trim().length < 3} onClick={() => card && call("/api/loyalty/block", { code: card, reason: reason.trim() })}>Bloquer la carte</button>
+          <div className="field">
+            <label>Carte perdue : numéro de la carte neuve qui reprend les tampons</label>
+            <input value={newCode} maxLength={40} placeholder="FID-XXXX-XXXX" onChange={(e) => setNewCode(e.target.value)} />
+          </div>
+          <button type="button" className="ghost" disabled={!card || !cardFrom(newCode)} onClick={() => card && call("/api/loyalty/transfer", { old_code: card, new_code: cardFrom(newCode) })}>Reporter les tampons</button>
+          <div className="field">
+            <label>Retrouver une carte par le téléphone du client</label>
+            <input value={phone} inputMode="tel" maxLength={8} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <button type="button" className="ghost" disabled={!/^[234]\d{7}$/.test(phone)} onClick={() => call("/api/loyalty/search", { phone })}>Rechercher</button>
+        </>
+      )}
+    </section>
   );
 }

@@ -6,3 +6,6 @@ pytest-cov==7.1.0
 pandas==2.3.3
 openpyxl==3.1.5
 defusedxml==0.7.1
+# J8 bis : étiquettes QR des cartes de fidélité (script d'administration)
+qrcode==8.2
+reportlab==4.4.4

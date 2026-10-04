@@ -270,3 +270,11 @@ a.staff-link:hover{outline:2px solid var(--sun)}
 .b-hist{fill:var(--ink-3);background:var(--ink-3)}
 .legend{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-3)}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:8px}
+
+/* Fidélité (J8 bis) */
+.scanner{display:grid;gap:8px}
+.scanner video{width:100%;max-width:420px;border-radius:14px;background:#000}
+.stamps{list-style:none;padding:0;margin:14px 0;display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.stamps li{width:48px;height:48px;border-radius:50%;border:2px dashed var(--ink-3);display:grid;place-items:center;font-weight:800;color:var(--ink-3)}
+.stamps li.on{border:0;background:var(--sun);color:var(--on-sun)}
+.stamps li.gift{width:auto;padding:0 14px;border-radius:999px;border:0;background:var(--ink);color:var(--paper)}
