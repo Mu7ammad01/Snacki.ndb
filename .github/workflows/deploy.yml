@@ -136,4 +136,5 @@ jobs:
           WEB_IMAGE: ${{ needs.build.outputs.web }}
           OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID_PROD }}   # identifiant public du client OAuth
           ADMIN_EMAIL: ${{ vars.SNACKI_ADMIN_EMAIL }}            # premier admin (créé une seule fois)
+          PUBLIC_URL: ${{ vars.PUBLIC_URL_PROD }}               # domaine public (ADR 0012), vide = run.app
         run: ./infra/gcp/deploy.sh prod "$API_IMAGE" "$WEB_IMAGE"

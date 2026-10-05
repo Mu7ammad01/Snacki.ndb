@@ -1,9 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { canonicalRedirect } from "@/lib/canonical";
 import { buildCsp, newNonce } from "@/lib/csp";
 
 /** Chaque page reçoit un nonce neuf et la CSP qui l'autorise (menace T06). */
 export function proxy(request: NextRequest) {
+  // Ancienne adresse Cloud Run ou www : redirection permanente vers l'adresse publique (ADR 0012).
+  const to = canonicalRedirect(
+    request.headers.get("host"),
+    request.nextUrl.pathname + request.nextUrl.search,
+    process.env.SNACKI_PUBLIC_URL,
+  );
+  if (to) return NextResponse.redirect(to, 308);
   const nonce = newNonce();
   const csp = buildCsp(nonce, process.env.NODE_ENV === "development");
   const headers = new Headers(request.headers);
