@@ -10,7 +10,7 @@ set -euo pipefail
 PROJECT="${GCP_PROJECT:?GCP_PROJECT manquant}"
 BUCKET="${PROJECT}-backups"
 NAME="snacki-restore"
-PG_IMAGE="${PG_IMAGE:-postgres:17}"   # même version majeure que pg_dump, ou plus récente
+PG_IMAGE="${PG_IMAGE:-postgres:18}"   # même version majeure que pg_dump, ou plus récente
 WORK="$(mktemp -d)"
 cleanup() { docker rm -f "$NAME" >/dev/null 2>&1 || true; rm -rf "$WORK"; }
 trap cleanup EXIT   # la copie contient des données de clients : rien ne reste sur le disque

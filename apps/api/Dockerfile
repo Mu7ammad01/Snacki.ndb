@@ -17,10 +17,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" PYTHONPA
 # Utilisateur sans droits : une faille dans l'API ne donne pas la main sur le conteneur.
 # pip est retiré : inutile pour faire tourner l'API, c'est un outil de moins pour un attaquant.
 # Correctifs de sécurité Debian publiés après l'image de base (porte 7, Trivy).
-# postgresql-client : pg_dump et psql pour la sauvegarde nocturne (ADR 0013), seuls outils ajoutés.
+# pg_dump et psql pour la sauvegarde nocturne (ADR 0013), seuls outils ajoutés. Leur version
+# majeure doit être au moins celle du serveur Neon (PostgreSQL 18) : dépôt officiel PostgreSQL
+# (clé fournie par le paquet Debian postgresql-common), retiré une fois le client installé.
+ARG PG_CLIENT=18
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-client \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates postgresql-common \
+ && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "postgresql-client-${PG_CLIENT}" \
+ && apt-get purge -y --auto-remove postgresql-common \
+ && rm -f /etc/apt/sources.list.d/pgdg.sources /etc/apt/sources.list.d/pgdg.list \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin snacki \
  && python -m pip uninstall -y pip

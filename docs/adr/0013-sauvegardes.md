@@ -14,7 +14,7 @@
 4. **Bucket** privé (accès public bloqué, accès uniforme), chiffré par Google, **conservation 30 jours** : aucune copie ne peut être effacée avant, même par un compte compromis ; effacement automatique à 31 jours.
 5. **Alerte** par e-mail (Cloud Monitoring) dès qu'une exécution échoue.
 6. **Test de restauration mensuel** : `infra/gcp/restore-test.sh` restaure la dernière copie dans un PostgreSQL jetable et compte les lignes.
-7. `pg_dump` et `psql` sont ajoutés à l'image de l'API (paquet `postgresql-client`) : une seule image, analysée par Trivy, déployée partout. La tâche est créée par `setup-backup.sh`, puis chaque déploiement lui donne la nouvelle image.
+7. `pg_dump` et `psql` sont ajoutés à l'image de l'API (`postgresql-client-18` du dépôt officiel PostgreSQL : sa version majeure doit être au moins celle du serveur Neon, PostgreSQL 18) : une seule image, analysée par Trivy, déployée partout. La tâche est créée par `setup-backup.sh`, puis chaque déploiement lui donne la nouvelle image.
 
 ## Conséquences
 
