@@ -1,7 +1,7 @@
 # Dépendances d'exécution de l'API, versions figées (Dependabot propose les mises à jour).
-fastapi==0.141.1
+fastapi==0.142.2
 uvicorn[standard]==0.54.0
-sqlalchemy==2.1.1
+sqlalchemy==2.1.2
 alembic==1.20.0
 psycopg[binary]==3.3.6
 pydantic==2.13.5
