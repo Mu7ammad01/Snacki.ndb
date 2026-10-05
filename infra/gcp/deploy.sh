@@ -36,7 +36,11 @@ fail() { echo "ÉCHEC : $*" >&2; exit 1; }
 
 # Adresse publique du web : connue avant le déploiement (service créé par setup-deploy.sh). Elle
 # fixe l'adresse de retour OAuth et l'origine acceptée par le web (jamais l'en-tête Host).
-WEB_URL="$(gcloud run services describe "$WEB" "${GCLOUD[@]}" --format 'value(status.url)')"
+RUN_URL="$(gcloud run services describe "$WEB" "${GCLOUD[@]}" --format 'value(status.url)')"
+# Domaine (ADR 0012) : PUBLIC_URL (variable GitHub PUBLIC_URL_PROD) remplace l'adresse run.app,
+# qui reste active et redirige vers lui. Sans PUBLIC_URL (staging), l'adresse run.app sert.
+WEB_URL="${PUBLIC_URL:-$RUN_URL}"
+[[ "$WEB_URL" =~ ^https://[a-z0-9.-]+$ ]] || fail "PUBLIC_URL invalide : https://domaine, sans / final"
 API_ENV="SNACKI_ENVIRONMENT=${ENV},SNACKI_OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}"
 API_ENV+=",SNACKI_OAUTH_REDIRECT_URI=${WEB_URL}/auth/callback"
 
@@ -92,6 +96,11 @@ echo "    pilotage : fermé sans session"
 code="$(curl -s -o /dev/null -w '%{http_code}' "${WEB_URL}/carte")"
 [ "$code" = "200" ] || fail "page de suivi de carte : ${code}"
 echo "    carte de fidélité : page publique en ligne"
+if [ "$WEB_URL" != "$RUN_URL" ]; then
+  where="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "${RUN_URL}/carte")"
+  [ "$where" = "308 ${WEB_URL}/carte" ] || fail "l'ancienne adresse doit renvoyer vers ${WEB_URL} (${where})"
+  echo "    ancienne adresse run.app : 308 vers ${WEB_URL} (QR des cartes imprimées)"
+fi
 
 echo "Version déployée en ${ENV} : ${WEB_URL}"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "web_url=${WEB_URL}" >>"$GITHUB_OUTPUT"; fi
