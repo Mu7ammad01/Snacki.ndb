@@ -2,6 +2,7 @@
 
     python -m snacki_api.manage migrate                 # job de chaque déploiement (J6, J8)
     python -m snacki_api.manage purge                   # conservation des données (J8)
+    python -m snacki_api.manage backup                  # sauvegarde nocturne (ADR 0013)
     python -m snacki_api.manage import-history FICHIER.xlsx [--dry-run] [--divisor 10]
     python -m snacki_api.manage loyalty-cards --count 44 --base-url https://… --out cartes.pdf
     python -m snacki_api.manage loyalty-cards --reprint LOT --base-url https://… --out cartes.pdf
@@ -30,7 +31,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import select
 
-from snacki_api import history, loyalty, loyalty_print, retention, staff
+from snacki_api import backup, history, loyalty, loyalty_print, retention, staff
 from snacki_api.config import get_settings
 from snacki_api.db import get_sessionmaker
 from snacki_api.models import LoyaltyCard
@@ -118,6 +119,7 @@ def main(argv: list[str]) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate")
     sub.add_parser("purge")
+    sub.add_parser("backup")
     imp = sub.add_parser("import-history")
     imp.add_argument("file", type=Path)
     imp.add_argument("--divisor", type=int, default=10, choices=(1, 10))
@@ -137,11 +139,13 @@ def main(argv: list[str]) -> int:
             migrate()
         elif args.cmd == "purge":
             purge()
+        elif args.cmd == "backup":
+            print(backup.run())
         elif args.cmd == "loyalty-cards":
             loyalty_cards(args.count, args.reprint, args.base_url, args.out, args.layout)
         else:
             import_history(args.file, args.divisor, args.dry_run)
-    except (history.HistoryError, FileNotFoundError) as exc:
+    except (history.HistoryError, backup.BackupError, FileNotFoundError) as exc:
         print(f"Refusé : {exc}", file=sys.stderr)
         return 1
     return 0
