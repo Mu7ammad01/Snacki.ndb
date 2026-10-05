@@ -51,6 +51,13 @@ gcloud run jobs deploy "snacki-migrate-${ENV}" "${GCLOUD[@]}" --image "$API_IMAG
   --command python --args=-m,snacki_api.manage,migrate --max-retries 0 --task-timeout 300s \
   --labels "app=snacki,env=${ENV}" --execute-now --wait
 
+# Sauvegarde nocturne (ADR 0013) : la tâche est créée une fois par setup-backup.sh ; chaque
+# déploiement lui donne la nouvelle image. Elle ne reçoit que l'URL de la base, aucun autre secret.
+if [ "$ENV" = prod ] && gcloud run jobs describe snacki-backup-prod "${GCLOUD[@]}" >/dev/null 2>&1; then
+  echo "    sauvegarde : tâche snacki-backup-prod mise à jour"
+  gcloud run jobs update snacki-backup-prod "${GCLOUD[@]}" --image "$API_IMAGE" >/dev/null
+fi
+
 echo "2/4 API (${ENV}) : privée, n'accepte que le jeton du serveur web"
 # Pas d'option --allow-unauthenticated : les droits posés par setup-deploy.sh sont conservés.
 gcloud run deploy "$API" "${GCLOUD[@]}" --image "$API_IMAGE" --service-account "$SA_API" \

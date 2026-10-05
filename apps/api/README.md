@@ -94,3 +94,16 @@ src/snacki_api/
 migrations/      Alembic : 0001 à 0007 (menu, commandes, staff, caisse, historique)
 tests/           tests sur PostgreSQL : menu, commandes, staff, caisse, pilotage, historique, sécurité
 ```
+
+## Sauvegardes (ADR 0013)
+
+Chaque nuit à 3 h (heure de Nouadhibou), la tâche `snacki-backup-prod` copie la base de production dans `gs://snacki-ndb-2026-backups/prod/…`, gardée 30 jours. Mise en place unique : `GCP_PROJECT=snacki-ndb-2026 ./infra/gcp/setup-backup.sh`.
+
+- **Chaque mois** : `GCP_PROJECT=snacki-ndb-2026 ./infra/gcp/restore-test.sh` (copie restaurée dans un PostgreSQL jetable, comptée, puis effacée).
+- **Lancer une sauvegarde tout de suite** (avant une opération risquée) : `gcloud run jobs execute snacki-backup-prod --region us-central1 --wait`.
+- **Incident réel** :
+  1. Arrêter les écritures : prévenir l'équipe (WhatsApp et papier).
+  2. Dans Neon, créer une **branche** vide `restauration-AAAAMMJJ`, puis copier son URL dans une invite masquée : `read -rsp "URL : " RESTORE_URL; export RESTORE_URL`.
+  3. Télécharger la copie choisie : `gcloud storage cp gs://snacki-ndb-2026-backups/prod/AAAA/MM/JJ/<fichier>.dump /tmp/s.dump`.
+  4. Restaurer : `docker run --rm -v /tmp/s.dump:/s.dump postgres:17 pg_restore --no-owner --no-privileges -d "$RESTORE_URL" /s.dump`, puis `rm /tmp/s.dump`.
+  5. Vérifier les chiffres, puis faire de cette branche la branche principale dans Neon. Ne jamais restaurer par-dessus la base en service.

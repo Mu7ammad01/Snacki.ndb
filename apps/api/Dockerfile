@@ -17,8 +17,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" PYTHONPA
 # Utilisateur sans droits : une faille dans l'API ne donne pas la main sur le conteneur.
 # pip est retiré : inutile pour faire tourner l'API, c'est un outil de moins pour un attaquant.
 # Correctifs de sécurité Debian publiés après l'image de base (porte 7, Trivy).
+# postgresql-client : pg_dump et psql pour la sauvegarde nocturne (ADR 0013), seuls outils ajoutés.
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-client \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin snacki \
  && python -m pip uninstall -y pip
