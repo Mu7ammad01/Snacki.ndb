@@ -1,6 +1,6 @@
 # Outils du dépôt, versions figées (mises à jour par Dependabot).
 pytest==9.1.1
-ruff==0.16.9
+ruff==0.16.10
 bandit[toml]==1.9.4
 pre-commit==4.6.2
 pytm==1.4.0
