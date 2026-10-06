@@ -1,0 +1,22 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+import { relay, staffFetch } from "@/lib/server/staff";
+import { isSameOrigin, publicOrigin } from "@/lib/staff";
+
+const MAX_BODY = 4000; // 1 000 caractères, arabe compris
+
+/** Assistant de commande (J9) : le message passe au serveur, jamais dans l'URL ni le stockage. */
+export async function POST(request: NextRequest) {
+  if (!isSameOrigin(request.headers.get("origin"), publicOrigin())) {
+    return NextResponse.json({ detail: "Origine refusée" }, { status: 403 });
+  }
+  const body = await request.text();
+  if (body.length > MAX_BODY) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
+  try {
+    return await relay(
+      await staffFetch("/v1/caisse/assistant", { method: "POST", body, headers: { "Content-Type": "application/json" } }),
+    );
+  } catch {
+    return NextResponse.json({ detail: "Service momentanément indisponible" }, { status: 503 });
+  }
+}

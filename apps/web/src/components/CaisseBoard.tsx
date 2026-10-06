@@ -17,7 +17,7 @@ import {
 } from "@/lib/caisse";
 import QrScanner, { canScan } from "@/components/QrScanner";
 import type { StaffMe } from "@/lib/staff";
-import type { CaisseOrder, LoyaltyCard, PaymentMethod, Product } from "@/lib/types";
+import type { AssistantResult, CaisseOrder, LoyaltyCard, PaymentMethod, Product } from "@/lib/types";
 
 const REFRESH_MS = 5_000;
 const PAYS = Object.keys(PAY_LABEL) as PaymentMethod[];
@@ -45,6 +45,8 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
   const [alerts, setAlerts] = useState(false);
   const [counter, setCounter] = useState(false);
   const [fidelity, setFidelity] = useState(false);
+  const [helper, setHelper] = useState(false);
+  const [preset, setPreset] = useState<{ key: number; qty: Record<string, number> }>({ key: 0, qty: {} });
   const known = useRef<Set<number> | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const names = new Map(products.map((p) => [p.id, p.name_fr]));
@@ -128,12 +130,14 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
           {!alerts && <button type="button" className="ghost" onClick={enableAlerts}>Activer son et notifications</button>}
           <button type="button" className="primary" onClick={() => setCounter((v) => !v)}>Vente au comptoir</button>
           <button type="button" className="ghost" onClick={() => setFidelity((v) => !v)}>Carte fidélité</button>
+          <button type="button" className="ghost" onClick={() => setHelper((v) => !v)}>Message WhatsApp</button>
         </div>
         <p className="muted">Encaissé aujourd&apos;hui : <b>{cashToday} MRU</b></p>
       </div>
 
       {msg && <p className={msg.bad ? "alert bad" : "alert"} role="status">{msg.text}</p>}
-      {counter && <CounterForm products={products} busy={busy} onSubmit={async (b) => { if (await post("/api/caisse/orders", b)) setCounter(false); }} />}
+      {helper && <AssistantTool onUse={(qty) => { setPreset((p) => ({ key: p.key + 1, qty })); setHelper(false); setCounter(true); }} />}
+      {counter && <CounterForm key={preset.key} initial={preset.qty} products={products} busy={busy} onSubmit={async (b) => { if (await post("/api/caisse/orders", b)) { setCounter(false); setPreset((p) => ({ key: p.key + 1, qty: {} })); } }} />}
       {fidelity && <FidelityTool manager={me.role !== "caissier"} />}
       {shown.length === 0 && <p className="muted">Aucune commande ici pour l&apos;instant.</p>}
 
@@ -241,8 +245,8 @@ function ReasonForm({ label, busy, onSubmit }: { label: string; busy: boolean; o
   );
 }
 
-function CounterForm({ products, busy, onSubmit }: { products: Product[]; busy: boolean; onSubmit: (b: object) => void }) {
-  const [qty, setQty] = useState<Record<string, number>>({});
+function CounterForm({ products, busy, onSubmit, initial = {} }: { products: Product[]; busy: boolean; onSubmit: (b: object) => void; initial?: Record<string, number> }) {
+  const [qty, setQty] = useState<Record<string, number>>(initial);
   const [name, setName] = useState("");
   const [paid, setPaid] = useState<PaymentMethod | "">("cash");
   const items = Object.entries(qty).filter(([, q]) => q > 0).map(([product_id, quantity]) => ({ product_id, quantity }));
@@ -365,5 +369,58 @@ function FidelityTool({ manager }: { manager: boolean }) {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Assistant de commande (J9) : la caissière colle un message WhatsApp, l'API propose des produits
+ * et des quantités (prix de la base). Rien n'est créé : la proposition remplit la vente au
+ * comptoir, que la caissière vérifie et enregistre elle-même.
+ */
+function AssistantTool({ onUse }: { onUse: (qty: Record<string, number>) => void }) {
+  const [message, setMessage] = useState("");
+  const [result, setResult] = useState<AssistantResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function analyse(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true); setError(null); setResult(null);
+    try {
+      const r = await fetch("/api/caisse/assistant", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: message.trim() }),
+      });
+      if (r.status === 429) setError("Trop de demandes : réessayez dans une minute.");
+      else if (!r.ok) setError("Analyse impossible : saisissez la vente à la main.");
+      else setResult((await r.json()) as AssistantResult);
+    } catch {
+      setError("Connexion impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form className="panel" onSubmit={analyse}>
+      <h2>Message WhatsApp</h2>
+      <div className="field">
+        <label htmlFor="wa-text">Collez le message du client</label>
+        <textarea id="wa-text" rows={4} maxLength={1000} value={message} onChange={(e) => setMessage(e.target.value)} />
+      </div>
+      <button className="primary" type="submit" disabled={busy || message.trim().length < 3}>{busy ? "Analyse…" : "Analyser"}</button>
+      {error && <p className="alert bad" role="status">{error}</p>}
+      {result && (
+        <div role="status">
+          <p className="muted">{result.engine === "gemini" ? "Proposition de l'IA" : "Analyse simple"} : à vérifier avant d&apos;enregistrer.</p>
+          <ul>{result.lines.map((l) => <li key={l.product_id}>{l.quantity} × {l.name} · {l.total_mru} MRU</li>)}</ul>
+          {result.lines.length > 0 && <p><b>Total ≈ {result.total_mru} MRU</b>{result.fulfilment === "livraison" ? " · livraison demandée" : ""}</p>}
+          {result.unknown.length > 0 && <p className="muted">Hors menu : {result.unknown.join(", ")}</p>}
+          {result.warnings.map((w) => <p key={w} className="alert bad">{w}</p>)}
+          {result.lines.length > 0 && (
+            <button type="button" className="primary" onClick={() => onUse(Object.fromEntries(result.lines.map((l) => [l.product_id, l.quantity])))}>
+              Remplir la vente au comptoir
+            </button>
+          )}
+        </div>
+      )}
+    </form>
   );
 }

@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     # J8 : coordonnées des clients effacées après ce délai (inventaire des données).
     retention_days: int = Field(default=90, ge=30, le=730)
 
+    # --- Assistant de commande (J9, ADR 0014) ---
+    # Clé de l'API Gemini, dans Secret Manager ; absente : analyse locale seulement.
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = Field(default="gemini-2.5-flash", pattern=r"^[a-z0-9.\-]{3,60}$")
+
     @field_validator("database_url")
     @classmethod
     def _driver_psycopg(cls, value: SecretStr) -> SecretStr:

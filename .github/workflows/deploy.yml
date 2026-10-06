@@ -106,6 +106,7 @@ jobs:
           API_IMAGE: ${{ needs.build.outputs.api }}
           WEB_IMAGE: ${{ needs.build.outputs.web }}
           OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID_STAGING }}   # identifiant public du client OAuth
+          GEMINI_ENABLED: ${{ vars.GEMINI_ENABLED_STAGING }}    # assistant IA (ADR 0014)
           ADMIN_EMAIL: ${{ vars.SNACKI_ADMIN_EMAIL }}            # premier admin (créé une seule fois)
         run: ./infra/gcp/deploy.sh staging "$API_IMAGE" "$WEB_IMAGE"
 
@@ -135,6 +136,7 @@ jobs:
           API_IMAGE: ${{ needs.build.outputs.api }}
           WEB_IMAGE: ${{ needs.build.outputs.web }}
           OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID_PROD }}   # identifiant public du client OAuth
+          GEMINI_ENABLED: ${{ vars.GEMINI_ENABLED_PROD }}       # assistant IA (ADR 0014)
           ADMIN_EMAIL: ${{ vars.SNACKI_ADMIN_EMAIL }}            # premier admin (créé une seule fois)
           PUBLIC_URL: ${{ vars.PUBLIC_URL_PROD }}               # domaine public (ADR 0012), vide = run.app
         run: ./infra/gcp/deploy.sh prod "$API_IMAGE" "$WEB_IMAGE"

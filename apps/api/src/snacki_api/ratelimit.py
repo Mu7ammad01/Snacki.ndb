@@ -43,4 +43,5 @@ DEFAULT_RULES = {
     "order_track": [(60, 60)],  # le suivi interroge régulièrement : 1 par seconde
     "auth": [(10, 60), (30, 3600)],  # connexions du staff : freine le bourrage d'essais
     "loyalty": [(20, 60), (200, 3600)],  # cartes : freine qui essaie des numéros au hasard
+    "assistant": [(10, 60), (100, 3600)],  # assistant IA : protège le quota Gemini (T15)
 }

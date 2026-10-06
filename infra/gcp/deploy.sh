@@ -28,6 +28,11 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 SECRETS="SNACKI_DATABASE_URL=snacki-db-url-${ENV}:latest"
 SECRETS+=",SNACKI_OAUTH_CLIENT_SECRET=snacki-oauth-secret-${ENV}:latest"
 SECRETS+=",SNACKI_SESSION_SECRET=snacki-session-key-${ENV}:latest"
+# Assistant IA (J9, ADR 0014) : clé Gemini seulement si la variable GitHub GEMINI_ENABLED_<ENV>
+# vaut true (secret créé avant par setup-gemini.sh) ; sinon l'assistant fait l'analyse locale.
+if [ "${GEMINI_ENABLED:-}" = true ]; then
+  SECRETS+=",SNACKI_GEMINI_API_KEY=snacki-gemini-key-${ENV}:latest"
+fi
 GCLOUD=(--project "$PROJECT" --region "$REGION" --quiet)
 # Garde-fous de coût (T23) : jamais plus de 2 instances, zéro instance au repos.
 LIMITS=(--min-instances 0 --max-instances 2 --cpu 1 --memory 512Mi --concurrency 40 --timeout 30s)
