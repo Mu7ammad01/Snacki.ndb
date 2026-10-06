@@ -327,6 +327,45 @@ class PilotageOut(BaseModel):
     loyalty: LoyaltyStats
 
 
+# --- Prévisions et résumé du jour (J10) ------------------------------------------------------
+
+
+class ForecastItem(BaseModel):
+    product_id: str
+    label: str
+    quantity: int
+
+
+class ForecastDay(BaseModel):
+    day: date
+    weekday: str
+    units: int
+    revenue_mru: int  # aux prix actuels du menu
+    items: list[ForecastItem]
+
+
+class Backtest(BaseModel):
+    days: int  # jours comparés sur les 4 dernières semaines
+    model_error: float | None  # écart moyen, en articles par jour
+    naive_error: float | None  # « comme la semaine dernière »
+
+
+class ForecastOut(BaseModel):
+    generated_for: date
+    open_days: int
+    reliability: Literal["bonne", "indicative", "insuffisante"]
+    backtest: Backtest
+    days: list[ForecastDay]
+
+
+class ResumeOut(BaseModel):
+    day: date
+    text: str
+    engine: Literal["gemini", "modele"]
+    warnings: list[str]
+    ai_available: bool  # bouton « Reformuler avec l'IA » proposé ou non
+
+
 # --- Fidélité (J8 bis) ---------------------------------------------------------------------
 
 CardText = Annotated[

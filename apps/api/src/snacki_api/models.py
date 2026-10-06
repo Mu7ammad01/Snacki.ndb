@@ -321,3 +321,14 @@ class LoyaltyEvent(Base):
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AiUsage(Base):
+    """Appels à l'IA par jour et par usage (J10, T15) : plafond partagé par toutes les instances."""
+
+    __tablename__ = "ai_usage"
+    __table_args__ = (CheckConstraint("calls >= 0", name="ai_usage_calls_positive"),)
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    feature: Mapped[str] = mapped_column(String(20), primary_key=True)
+    calls: Mapped[int] = mapped_column(default=0)

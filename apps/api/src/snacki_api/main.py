@@ -6,7 +6,7 @@ Lancement local, depuis apps/api avec SNACKI_DATABASE_URL :
 
 import logging
 from datetime import UTC, date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +15,19 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from snacki_api import assistant, auth, caisse, loyalty, orders, pilotage, repository, staff
+from snacki_api import (
+    assistant,
+    auth,
+    caisse,
+    forecast,
+    loyalty,
+    orders,
+    pilotage,
+    quota,
+    repository,
+    resume,
+    staff,
+)
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
 from snacki_api.models import Category, StaffRole, StaffUser
@@ -31,6 +43,7 @@ from snacki_api.schemas import (
     CaisseDayOut,
     CaisseOrderOut,
     CounterOrderIn,
+    ForecastOut,
     Health,
     LoyaltyBlockIn,
     LoyaltyCodeIn,
@@ -46,6 +59,7 @@ from snacki_api.schemas import (
     PilotageOut,
     ProductOut,
     ReasonIn,
+    ResumeOut,
     StaffCreateIn,
     StaffMeOut,
     StaffOut,
@@ -85,6 +99,11 @@ class Utf8JSONResponse(JSONResponse):
     """Type de contenu avec le jeu de caractères explicite (ASVS V4.1.1)."""
 
     media_type = "application/json; charset=utf-8"
+
+
+def today() -> date:
+    """Jour de service : Nouadhibou vit à UTC+0."""
+    return datetime.now(UTC).date()
 
 
 def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = None) -> FastAPI:
@@ -367,7 +386,12 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
         rate_limit("assistant", request)
         cfg = settings
         key = cfg.gemini_api_key.get_secret_value() if cfg.gemini_api_key else ""
-        result = assistant.analyse(data.text, repository.list_menu(session), key, cfg.gemini_model)
+        over = bool(key) and not quota.take(session, "assistant", cfg.ai_cap_assistant, today())
+        result = assistant.analyse(
+            data.text, repository.list_menu(session), "" if over else key, cfg.gemini_model
+        )
+        if over:  # T15 : plafond du jour atteint, l'analyse locale prend le relais
+            result["warnings"].append("Quota IA du jour atteint : analyse simple, à vérifier")
         # Le message n'est jamais enregistré : seulement sa longueur et le résultat.
         staff.audit(
             session,
@@ -440,6 +464,44 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
         if start > end or (end - start).days >= pilotage.MAX_DAYS:
             raise HTTPException(status_code=422, detail="Période invalide (366 jours au plus)")
         return PilotageOut.model_validate(pilotage.summary(session, start, end))
+
+    @app.get("/v1/pilotage/previsions", response_model=ForecastOut, tags=["pilotage"])
+    def pilotage_forecast(_user: ManagerDep, session: SessionDep) -> ForecastOut:
+        """J10 : articles attendus aujourd'hui et les 6 jours suivants, par produit."""
+        return ForecastOut.model_validate(forecast.forecast(session, today()))
+
+    @app.get("/v1/pilotage/resume", response_model=ResumeOut, tags=["pilotage"])
+    def pilotage_resume(
+        request: Request,
+        user: ManagerDep,
+        session: SessionDep,
+        day: Annotated[date | None, Query()] = None,
+        ia: Annotated[bool, Query()] = False,
+    ) -> ResumeOut:
+        """J10 : résumé du jour ; reformulation par l'IA sur demande, chiffres vérifiés (T16)."""
+        rate_limit("resume", request)
+        day = day or today()
+        if day > today() or (today() - day).days >= pilotage.MAX_DAYS:
+            raise HTTPException(status_code=422, detail="Jour invalide")
+        f = resume.facts(session, day)
+        key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+        text = resume.template(f)
+        engine: Literal["gemini", "modele"] = "modele"
+        warnings: list[str] = []
+        if ia and key:
+            hit = resume.cached(f)
+            if hit:
+                text, engine = hit, "gemini"
+            elif quota.take(session, "resume", settings.ai_cap_resume, today()):
+                session.commit()  # l'appel compte même si l'IA échoue ensuite
+                text, engine, warnings = resume.rephrase(f, key, settings.gemini_model)
+                staff.audit(session, "resume_ia", user, day.isoformat(), {"moteur": engine})
+                session.commit()
+            else:
+                warnings = ["Quota IA du jour atteint : résumé standard"]
+        return ResumeOut(
+            day=day, text=text, engine=engine, warnings=warnings, ai_available=bool(key)
+        )
 
     # --- Fidélité (J8 bis) ------------------------------------------------------------------
 
