@@ -44,4 +44,5 @@ DEFAULT_RULES = {
     "auth": [(10, 60), (30, 3600)],  # connexions du staff : freine le bourrage d'essais
     "loyalty": [(20, 60), (200, 3600)],  # cartes : freine qui essaie des numéros au hasard
     "assistant": [(10, 60), (100, 3600)],  # assistant IA : protège le quota Gemini (T15)
+    "resume": [(10, 60), (60, 3600)],  # résumé du jour (J10) : même raison
 }

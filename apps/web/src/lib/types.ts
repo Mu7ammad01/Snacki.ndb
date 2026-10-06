@@ -90,6 +90,30 @@ export interface Pilotage {
   loyalty: { stamps: number; rewards: number; discount_mru: number; active_cards: number };
 }
 
+/** Prévisions (J10) : articles attendus aujourd'hui et les 6 jours suivants. */
+export interface Forecast {
+  generated_for: string;
+  open_days: number;
+  reliability: "bonne" | "indicative" | "insuffisante";
+  backtest: { days: number; model_error: number | null; naive_error: number | null };
+  days: {
+    day: string;
+    weekday: string;
+    units: number;
+    revenue_mru: number;
+    items: { product_id: string; label: string; quantity: number }[];
+  }[];
+}
+
+/** Résumé du jour (J10) : texte modèle, ou reformulé par l'IA avec chiffres vérifiés. */
+export interface Resume {
+  day: string;
+  text: string;
+  engine: "gemini" | "modele";
+  warnings: string[];
+  ai_available: boolean;
+}
+
 /** Fidélité (J8 bis) : état d'une carte vu par la caisse. */
 export interface LoyaltyCard {
   card: string;

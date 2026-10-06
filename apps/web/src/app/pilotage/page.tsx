@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { PAY_LABEL } from "@/lib/caisse";
 import { mru, periodFrom, presets, share, shortDay } from "@/lib/pilotage";
 import { currentStaff, staffFetch } from "@/lib/server/staff";
-import type { Pilotage } from "@/lib/types";
+import type { Forecast, Pilotage, Resume } from "@/lib/types";
 
 /**
  * Barre horizontale en SVG : la CSP interdit les attributs style en ligne ; les largeurs passent
@@ -35,12 +35,14 @@ export const metadata: Metadata = { title: "Pilotage — Snacki", robots: { inde
 export default async function PilotagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string; end?: string }>;
+  searchParams: Promise<{ start?: string; end?: string; ia?: string }>;
 }) {
   const me = await currentStaff();
   if (!me) redirect("/connexion");
   const today = new Date().toISOString().slice(0, 10); // Nouadhibou : UTC+0
-  const period = periodFrom(await searchParams, today);
+  const params = await searchParams;
+  const period = periodFrom(params, today);
+  const wantAi = params.ia === "1";
 
   let data: Pilotage | null = null;
   let error: string | null = null;
@@ -53,6 +55,23 @@ export default async function PilotagePage({
     status = 503;
   }
   if (status === 401) redirect("/connexion");
+
+  // J10 : prévisions et résumé ; s'ils manquent, le reste de la page s'affiche quand même.
+  const optional = async <T,>(path: string): Promise<T | null> => {
+    try {
+      const r = await staffFetch(path);
+      return r.ok ? ((await r.json()) as T) : null;
+    } catch {
+      return null;
+    }
+  };
+  const [forecast, resume] = data
+    ? await Promise.all([
+        optional<Forecast>("/v1/pilotage/previsions"),
+        optional<Resume>(`/v1/pilotage/resume?day=${period.end}${wantAi ? "&ia=true" : ""}`),
+      ])
+    : [null, null];
+  const fcMax = Math.max(0, ...(forecast?.days ?? []).map((d) => d.units));
   if (status === 403) error = "Le pilotage est réservé à la gérante et à l'admin.";
   else if (!data) error = "Chiffres momentanément indisponibles.";
 
@@ -93,6 +112,46 @@ export default async function PilotagePage({
             <div><span>Aujourd&apos;hui</span><b>{mru(data.today_mru)}</b></div>
             <div><span>Cumul depuis l&apos;ouverture</span><b>{mru(data.all_time_mru)}</b></div>
           </section>
+
+          {resume && (
+            <section className="track">
+              <h2>Résumé du {shortDay(resume.day)}</h2>
+              <p>{resume.text}</p>
+              {resume.warnings.map((w) => <p key={w} className="muted">{w}</p>)}
+              <p className="muted">
+                {resume.engine === "gemini"
+                  ? "Reformulé par l'IA ; chaque chiffre a été vérifié dans les ventes."
+                  : "Résumé calculé directement à partir des ventes."}
+                {resume.ai_available && resume.engine !== "gemini" && (
+                  <> <a href={`/pilotage?start=${period.start}&end=${period.end}&ia=1`}>Reformuler avec l&apos;IA</a></>
+                )}
+              </p>
+            </section>
+          )}
+
+          {forecast && (
+            <section className="track">
+              <h2>Prévisions (7 jours)</h2>
+              <ul className="bars">
+                {forecast.days.map((d) => (
+                  <li key={d.day}>
+                    <span className="bl">{d.weekday.slice(0, 3)} {shortDay(d.day)}</span>
+                    <Bar max={fcMax} parts={[{ value: d.units, cls: "b-hist" }]} />
+                    <span className="bv">≈ {d.units} art.</span>
+                  </li>
+                ))}
+              </ul>
+              {forecast.days[0]?.items.length > 0 && (
+                <p>À préparer aujourd&apos;hui : {forecast.days[0].items.map((i) => `${i.label} ${i.quantity}`).join(" · ")}</p>
+              )}
+              <p className="muted">
+                {forecast.reliability === "bonne" && "Fiabilité : bonne (meilleure que « comme la semaine dernière » sur 4 semaines)."}
+                {forecast.reliability === "indicative" && "Fiabilité : indicative ; à corriger avec votre expérience."}
+                {forecast.reliability === "insuffisante" && "Pas encore assez de jours de ventes pour une prévision fiable (14 au moins)."}
+                {forecast.backtest.model_error !== null && ` Écart moyen : ${forecast.backtest.model_error} articles par jour (méthode simple : ${forecast.backtest.naive_error}).`}
+              </p>
+            </section>
+          )}
 
           <section className="track">
             <h2>Par jour</h2>

@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # Clé de l'API Gemini, dans Secret Manager ; absente : analyse locale seulement.
     gemini_api_key: SecretStr | None = None
     gemini_model: str = Field(default="gemini-2.5-flash", pattern=r"^[a-z0-9.\-]{3,60}$")
+    # J10 (T15) : plafond d'appels à l'IA par jour, toutes instances confondues ; 0 = jamais.
+    ai_cap_assistant: int = Field(default=200, ge=0, le=5000)
+    ai_cap_resume: int = Field(default=20, ge=0, le=500)
 
     @field_validator("database_url")
     @classmethod
