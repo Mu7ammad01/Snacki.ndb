@@ -56,6 +56,16 @@ def test_masquage_avant_envoi(raw):
     assert "@" not in masked and "1234" not in masked and "33 44" not in masked
 
 
+def test_masquage_en_temps_lineaire():
+    """CodeQL (ReDoS) : un texte piégé ne doit pas bloquer l'API."""
+    import time
+
+    for piege in ("a@" + "+" * 20000, "1" + " " * 20000 + "x", "@." * 10000):
+        start = time.perf_counter()
+        assistant.mask(piege)
+        assert time.perf_counter() - start < 0.5
+
+
 def gemini(payload, seen=None, status=200):
     def handler(request: httpx.Request) -> httpx.Response:
         if seen is not None:

@@ -49,8 +49,8 @@ NUMBERS = {
 }  # fmt: skip
 DELIVERY = re.compile(r"livr|domicile|delivery|توصيل|وصل|ارسل")
 PICKUP = re.compile(r"emporter|je passe|je viens|nji|نجي|ناخذ")
-PHONE = re.compile(r"(?:\+|00)?\d[\d\s.\-]{6,}\d")
-EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+# Une seule répétition, sans chevauchement : temps linéaire, même sur un texte piégé (ReDoS).
+DIGIT_RUN = re.compile(r"\+?\d[\d .\-]*")
 
 SYSTEM = (
     "Tu extrais une commande d'un message de client d'un snack à Nouadhibou. "
@@ -77,10 +77,17 @@ class Proposal:
 
 def mask(text: str) -> str:
     """Retire ce qui identifie le client avant tout envoi hors de Snacki (T14)."""
-    text = EMAIL.sub("[EMAIL]", text)
-    return PHONE.sub(
-        lambda m: "[TEL]" if sum(c.isdigit() for c in m.group()) >= 8 else m.group(), text
-    )
+    words = [
+        "[EMAIL]" if "@" in w and "." in w.split("@", 1)[1] else w for w in re.split(r"(\s+)", text)
+    ]
+
+    def phone(m: re.Match[str]) -> str:
+        run = m.group()
+        if sum(c.isdigit() for c in run) < 8:
+            return run
+        return "[TEL]" + run[len(run.rstrip(" .-")) :]  # garde l'espace qui suit
+
+    return DIGIT_RUN.sub(phone, "".join(words))
 
 
 def _normalize(text: str) -> str:
