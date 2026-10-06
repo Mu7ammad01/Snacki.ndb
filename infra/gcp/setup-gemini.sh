@@ -17,7 +17,8 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 read -rsp "Clé API Gemini (${ENV}), invisible à la saisie : " KEY
 echo
-[[ "$KEY" =~ ^[A-Za-z0-9_-]{30,60}$ ]] || { echo "Format de clé inattendu : rien n'est enregistré" >&2; exit 1; }
+KEY="${KEY//[[:space:]]/}"  # espaces ou retour à la ligne collés par erreur
+[[ "$KEY" =~ ^[A-Za-z0-9._-]{20,200}$ ]] || { echo "Format de clé inattendu : rien n'est enregistré" >&2; exit 1; }
 
 if ! gcloud secrets describe "$SECRET" --project "$PROJECT" >/dev/null 2>&1; then
   gcloud secrets create "$SECRET" --project "$PROJECT" --replication-policy automatic >/dev/null
