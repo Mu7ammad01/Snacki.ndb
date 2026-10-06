@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from snacki_api import auth, caisse, loyalty, orders, pilotage, repository, staff
+from snacki_api import assistant, auth, caisse, loyalty, orders, pilotage, repository, staff
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
 from snacki_api.models import Category, StaffRole, StaffUser
@@ -23,6 +23,8 @@ from snacki_api.ratelimit import DEFAULT_RULES, RateLimiter
 from snacki_api.schemas import (
     AcceptIn,
     AdvanceIn,
+    AssistantIn,
+    AssistantOut,
     AuthCallbackIn,
     AuthSessionOut,
     AuthStartOut,
@@ -356,6 +358,26 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
         except orders.ProduitIndisponible as exc:
             raise HTTPException(status_code=422, detail=f"Produit indisponible : {exc}") from None
         return CaisseOrderOut.model_validate(order)
+
+    @app.post("/v1/caisse/assistant", response_model=AssistantOut, tags=["caisse"])
+    def caisse_assistant(
+        request: Request, data: AssistantIn, user: StaffDep, session: SessionDep
+    ) -> AssistantOut:
+        """J9 : message WhatsApp → proposition de vente, à vérifier ; rien n'est créé (T13, T14)."""
+        rate_limit("assistant", request)
+        cfg = settings
+        key = cfg.gemini_api_key.get_secret_value() if cfg.gemini_api_key else ""
+        result = assistant.analyse(data.text, repository.list_menu(session), key, cfg.gemini_model)
+        # Le message n'est jamais enregistré : seulement sa longueur et le résultat.
+        staff.audit(
+            session,
+            "assistant",
+            user,
+            None,
+            {"moteur": result["engine"], "lignes": len(result["lines"]), "car": len(data.text)},
+        )
+        session.commit()
+        return AssistantOut.model_validate(result)
 
     @app.post("/v1/caisse/orders/{order_id}/accept", response_model=CaisseOrderOut, tags=["caisse"])
     def caisse_accept(

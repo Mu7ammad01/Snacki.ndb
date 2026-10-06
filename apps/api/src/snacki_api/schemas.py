@@ -5,7 +5,7 @@ On ne renvoie jamais un objet de la base tel quel : chaque réponse liste ses ch
 
 import re
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -392,3 +392,30 @@ class LoyaltyPublicOut(BaseModel):
     progress: int
     goal: int
     rewards_available: int
+
+
+class AssistantIn(BaseModel):
+    """Message WhatsApp collé par la caissière (J9). Jamais enregistré."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=3, max_length=1000)
+
+
+class AssistantLine(BaseModel):
+    product_id: str
+    name: str
+    quantity: int
+    unit_price_mru: int
+    total_mru: int
+
+
+class AssistantOut(BaseModel):
+    """Proposition à vérifier : rien n'est créé tant que la caissière n'a pas validé."""
+
+    engine: Literal["gemini", "local"]
+    lines: list[AssistantLine]
+    total_mru: int
+    fulfilment: Literal["emporter", "livraison", "inconnu"]
+    unknown: list[str]
+    warnings: list[str]

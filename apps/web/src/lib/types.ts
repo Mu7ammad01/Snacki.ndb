@@ -104,3 +104,13 @@ export interface LoyaltyCard {
 
 /** Vue du client (QR de sa carte) : progression seulement. */
 export type LoyaltyPublic = Pick<LoyaltyCard, "card" | "status" | "progress" | "goal" | "rewards_available">;
+
+/** Proposition de l'assistant de commande (J9) : à vérifier avant toute vente. */
+export interface AssistantResult {
+  engine: "gemini" | "local";
+  lines: { product_id: string; name: string; quantity: number; unit_price_mru: number; total_mru: number }[];
+  total_mru: number;
+  fulfilment: "emporter" | "livraison" | "inconnu";
+  unknown: string[];
+  warnings: string[];
+}

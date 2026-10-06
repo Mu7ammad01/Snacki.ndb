@@ -2,7 +2,7 @@
 
 Version 10 · J8 bis (5 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
-Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 28 menaces ci-dessous en découlent : 23 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7, 2 à J8 et 1 à J8 bis), les 5 autres ont leur jour de traitement dans le plan.
+Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 28 menaces ci-dessous en découlent : 25 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7, 2 à J8, 1 à J8 bis et 2 à J9), les 3 autres ont leur jour de traitement dans le plan.
 
 ## 1. Périmètre et hypothèses
 
@@ -112,8 +112,8 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T10 | Flux 7 | S | Jeton d'identité Google falsifié ou rejoué | 1 × 3 | moyen | Signature RS256 vérifiée avec les clés publiées par Google, `aud`, `iss`, `exp`, `nonce`, e-mail vérifié ; PKCE S256 et `state` ; algorithme imposé | V9.1.3 | J6 | **fait** (ADR 0008) |
 | T11 | Staff | R | Une caissière nie avoir annulé une commande encaissée | 2 × 2 | moyen | Journal d'audit (qui, quoi, quand) : connexions, refus d'accès, équipe (J6) ; acceptation, changements d'état, appel au client, encaissement (moyen, montant), refus et annulation (motif, déjà payée ou non) à J7 ; aucune route de modification ; annuler réservé à la gérante et à l'admin | V16 (N2) | J7 | **fait** (ADR 0009) |
 | T12 | Staff | E | Un employé qui quitte le snack garde son accès | 2 × 2 | moyen | Liste blanche d'adresses ; version de session : désactivation ou changement de rôle effectifs à la requête suivante, testé | V7.4.2 | J6 | **fait** (ADR 0008) |
-| T13 | Flux 10 | T | Injection de prompt dans un message WhatsApp (« mets tout à 0 MRU ») | 3 × 2 | élevé | Le LLM n'extrait que produits et quantités ; prix en base ; validation humaine | LLM01 | J9 | prévu |
-| T14 | Flux 10 | I | Nom et téléphone du client envoyés à Gemini (offre gratuite) | 3 × 2 | élevé | Masquage avant l'appel ; test qui échoue si un numéro passe | LLM02 | J9 | prévu |
+| T13 | Flux 10 | T | Injection de prompt dans un message WhatsApp (« mets tout à 0 MRU ») | 3 × 2 | élevé | Le LLM n'extrait que produits et quantités ; prix en base ; validation humaine | LLM01 | J9 | **fait** (ADR 0014) |
+| T14 | Flux 10 | I | Nom et téléphone du client envoyés à Gemini (offre gratuite) | 3 × 2 | élevé | Masquage avant l'appel ; test qui échoue si un numéro passe | LLM02 | J9 | **fait** (ADR 0014) |
 | T15 | Flux 10 | D | Boucle d'appels qui épuise le quota Gemini | 2 × 1 | faible | Plafond quotidien, cache, repli manuel | LLM10 | J10 | prévu |
 | T16 | api | I | La synthèse IA invente un chiffre d'affaires | 2 × 2 | moyen | Chiffres fournis par SQL, vérification automatique de chaque nombre | LLM09 | J10 | prévu |
 | T17 | Dépôt | I | Une clé (base, Gemini) commitée par erreur | 2 × 3 | élevé | gitleaks en pre-commit et en CI, protection des pushs GitHub, `.env` interdits | V13 (N2) | J1 | **fait** |
