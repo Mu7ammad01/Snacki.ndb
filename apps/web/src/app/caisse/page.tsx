@@ -6,7 +6,12 @@ import { apiFetch } from "@/lib/server/api";
 import { currentStaff } from "@/lib/server/staff";
 import type { Product } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Caisse — Snacki", robots: { index: false, follow: false } };
+// Installée depuis cette page, l'app s'ouvre directement sur la caisse (J11).
+export const metadata: Metadata = {
+  title: "Caisse — Snacki",
+  robots: { index: false, follow: false },
+  manifest: "/manifest-caisse.webmanifest",
+};
 
 async function loadMenu(): Promise<Product[]> {
   try {

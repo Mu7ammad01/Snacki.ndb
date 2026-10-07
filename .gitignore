@@ -25,6 +25,9 @@ build/
 # Node / Next.js
 node_modules/
 .next/
+# Tests de bout en bout (J11) : rapports et traces locales
+test-results/
+playwright-report/
 out/
 *.tsbuildinfo
 

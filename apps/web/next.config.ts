@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Le navigateur doit toujours vérifier la dernière version du service worker (J11).
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] },
       // Caméra autorisée sur la seule page de la caisse (lecture du QR des cartes, J8 bis).
       { source: "/((?!caisse$).*)", headers: [{ key: "Permissions-Policy", value: NO_DEVICES }] },
       { source: "/caisse", headers: [{ key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=()" }] },

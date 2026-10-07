@@ -9,3 +9,7 @@ Dockerfile
 next-env.d.ts
 *.tsbuildinfo
 vitest.config.mts
+e2e
+playwright.config.ts
+test-results
+playwright-report
