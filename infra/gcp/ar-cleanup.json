@@ -5,8 +5,8 @@
     "condition": { "tagState": "any", "olderThan": "7d" }
   },
   {
-    "name": "garder-les-3-dernieres",
+    "name": "garder-les-9-dernieres",
     "action": { "type": "Keep" },
-    "mostRecentVersions": { "keepCount": 3 }
+    "mostRecentVersions": { "keepCount": 9 }
   }
 ]

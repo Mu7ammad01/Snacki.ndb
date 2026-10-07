@@ -187,3 +187,4 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 07/10/2026 | 9 | J8 : T26 (pilotage réservé) et T27 (import Excel) traitées ; conservation appliquée (coordonnées 90 jours, journal 1 an) ; historique ajouté à l'inventaire des données |
 | 05/10/2026 | 10 | J8 bis : T28 (fraude à la fidélité) traitée ; carte et téléphone facultatif ajoutés à l'inventaire des données |
 | 06/10/2026 | 11 | J10 : T15 (quota Gemini) et T16 (chiffre inventé par l'IA) traitées ; seuls des agrégats sans donnée personnelle partent vers Gemini pour le résumé |
+| 07/10/2026 | 12 | J12 : T20 complétée (SBOM CycloneDX, images signées sans clé et vérifiées avant chaque déploiement) ; porte 9 active (OWASP ZAP baseline sur staging) |

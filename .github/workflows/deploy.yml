@@ -26,6 +26,12 @@ env:
   GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: ${{ vars.GCP_REGION }}
   REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/snacki
+  # J12 (ADR 0017) : cosign installé par « go install », donc vérifié par la base publique de
+  # sommes de contrôle de Go (sum.golang.org). Version mise à jour à la main, comme une action.
+  COSIGN_VERSION: v2.4.1
+  # Seule identité acceptée pour une signature : CE workflow, sur main, de CE dépôt.
+  SIGNER: https://github.com/${{ github.repository }}/.github/workflows/deploy.yml@refs/heads/main
+  ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
   build:
@@ -79,12 +85,42 @@ jobs:
             docker push --quiet "${REGISTRY}/${s}:${SHA}"
             echo "${s}=$(docker inspect --format '{{index .RepoDigests 0}}' "${REGISTRY}/${s}:${SHA}")" >> "$GITHUB_OUTPUT"
           done
+      # J12 · SBOM : la liste de tous les composants de chaque image (format CycloneDX).
+      - name: SBOM (api)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/api:${{ env.SHA }}
+          format: cyclonedx
+          output: sbom-api.cdx.json
+      - name: SBOM (web)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/web:${{ env.SHA }}
+          format: cyclonedx
+          output: sbom-web.cdx.json
+      - name: Installer cosign
+        run: |
+          go install "github.com/sigstore/cosign/v2/cmd/cosign@${COSIGN_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      # Signature « sans clé » : le jeton OIDC de ce job prouve l'identité (dépôt, workflow, main) ;
+      # le certificat et la signature sont publiés dans le journal public Sigstore (Rekor).
+      - name: Signer les images et leur attacher le SBOM
+        env:
+          API: ${{ steps.push.outputs.api }}
+          WEB: ${{ steps.push.outputs.web }}
+        run: |
+          cosign sign --yes "$API"
+          cosign sign --yes "$WEB"
+          cosign attest --yes --type cyclonedx --predicate sbom-api.cdx.json "$API"
+          cosign attest --yes --type cyclonedx --predicate sbom-web.cdx.json "$WEB"
 
   staging:
     name: staging
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      web_url: ${{ steps.deploy.outputs.web_url }}
     permissions:
       contents: read
       id-token: write
@@ -100,6 +136,23 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Installer cosign
+        run: |
+          go install "github.com/sigstore/cosign/v2/cmd/cosign@${COSIGN_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      # J12 : une image non signée par ce workflow sur main, ou sans SBOM signé, n'est pas déployée.
+      - name: Vérifier signature et SBOM des images
+        env:
+          API: ${{ needs.build.outputs.api }}
+          WEB: ${{ needs.build.outputs.web }}
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          for image in "$API" "$WEB"; do
+            cosign verify --certificate-identity "$SIGNER" --certificate-oidc-issuer "$ISSUER" "$image" >/dev/null
+            cosign verify-attestation --type cyclonedx --certificate-identity "$SIGNER" \
+              --certificate-oidc-issuer "$ISSUER" "$image" >/dev/null
+            echo "Signature et SBOM vérifiés : ${image##*/}"
+          done
       - name: Déployer en staging
         id: deploy
         env:
@@ -110,9 +163,35 @@ jobs:
           ADMIN_EMAIL: ${{ vars.SNACKI_ADMIN_EMAIL }}            # premier admin (créé une seule fois)
         run: ./infra/gcp/deploy.sh staging "$API_IMAGE" "$WEB_IMAGE"
 
+  # Porte 9 (J12) : OWASP ZAP « baseline » (analyse passive) sur staging, avant la production.
+  # Les règles bloquantes sont dans .zap/rules.tsv ; les autres alertes s'affichent sans bloquer.
+  # Le job n'a ni jeton Google ni secret : l'outil ne voit que ce que voit un visiteur.
+  zap:
+    name: zap (staging)
+    needs: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Porte 9 · OWASP ZAP baseline
+        env:
+          TARGET: ${{ needs.staging.outputs.web_url }}
+        run: |
+          [[ "$TARGET" =~ ^https://[a-z0-9.-]+$ ]] || { echo "Adresse de staging invalide" >&2; exit 1; }
+          work="$(mktemp -d)"
+          cp .zap/rules.tsv "$work/"
+          chmod -R a+rwX "$work"
+          docker run --rm -v "${work}:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "$TARGET" -c rules.tsv -m 2 -I
+
   production:
     name: production
-    needs: [build, staging]
+    needs: [build, staging, zap]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -130,6 +209,23 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Installer cosign
+        run: |
+          go install "github.com/sigstore/cosign/v2/cmd/cosign@${COSIGN_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      # J12 : une image non signée par ce workflow sur main, ou sans SBOM signé, n'est pas déployée.
+      - name: Vérifier signature et SBOM des images
+        env:
+          API: ${{ needs.build.outputs.api }}
+          WEB: ${{ needs.build.outputs.web }}
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          for image in "$API" "$WEB"; do
+            cosign verify --certificate-identity "$SIGNER" --certificate-oidc-issuer "$ISSUER" "$image" >/dev/null
+            cosign verify-attestation --type cyclonedx --certificate-identity "$SIGNER" \
+              --certificate-oidc-issuer "$ISSUER" "$image" >/dev/null
+            echo "Signature et SBOM vérifiés : ${image##*/}"
+          done
       - name: Déployer en production (mêmes images que staging)
         id: deploy
         env:
