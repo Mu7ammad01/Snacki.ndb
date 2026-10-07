@@ -4,6 +4,10 @@
 #
 #   GCP_PROJECT=snacki-ndb-2026 ./infra/gcp/restore-test.sh
 #
+# Lancé aussi chaque mois par GitHub Actions (.github/workflows/restore-test.yml) : là, une
+# sauvegarde de plus de 26 h fait échouer le test, et seuls des contrôles oui/non sont affichés
+# (les journaux d'Actions peuvent être lus par d'autres : aucun chiffre de l'activité).
+#
 # Une sauvegarde qu'on n'a jamais restaurée n'est pas une sauvegarde.
 set -euo pipefail
 
@@ -21,21 +25,39 @@ STAMP="$(grep -oE '[0-9]{8}T[0-9]{6}Z' <<<"$LATEST")"
 TAKEN="$(date -u -d "${STAMP:0:8} ${STAMP:9:2}:${STAMP:11:2}:${STAMP:13:2}" +%s)"
 AGE_H=$(( ($(date -u +%s) - TAKEN) / 3600 ))
 echo "Dernière sauvegarde : ${LATEST##*/} (il y a ${AGE_H} h)"
-[ "$AGE_H" -le 26 ] || echo "ATTENTION : plus de 26 h, la sauvegarde de cette nuit manque"
+CI_MODE="${GITHUB_ACTIONS:-false}"
+if [ "$AGE_H" -gt 26 ]; then
+  echo "ATTENTION : plus de 26 h, la sauvegarde de cette nuit manque" >&2
+  [ "$CI_MODE" != "true" ] || exit 1
+fi
 
 gcloud storage cp "$LATEST" "${WORK}/snacki.dump" --project "$PROJECT" >/dev/null
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 docker run -d --name "$NAME" -e POSTGRES_PASSWORD=restore-only "$PG_IMAGE" >/dev/null
 for _ in $(seq 1 30); do docker exec "$NAME" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
 docker cp "${WORK}/snacki.dump" "${NAME}:/tmp/snacki.dump"
-docker exec "$NAME" pg_restore --no-owner --no-privileges -U postgres -d postgres /tmp/snacki.dump
+# --exit-on-error : la moindre erreur de restauration fait échouer le test.
+docker exec "$NAME" pg_restore --exit-on-error --no-owner --no-privileges -U postgres -d postgres /tmp/snacki.dump
 
-echo "Contenu restauré :"
-docker exec "$NAME" psql -U postgres -At -F ' : ' -c "
-  SELECT 'commandes', count(*) FROM orders
-  UNION ALL SELECT 'ventes historiques', count(*) FROM history_sale
-  UNION ALL SELECT 'cartes de fidélité', count(*) FROM loyalty_card
-  UNION ALL SELECT 'comptes du staff', count(*) FROM staff_user
-  UNION ALL SELECT 'version du schéma', (SELECT count(*) FROM alembic_version)" |
-  sed 's/^/    /'
+# Contrôles : schéma à jour (une version Alembic) et tables principales lisibles.
+CHECK="$(docker exec "$NAME" psql -U postgres -At -c "
+  SELECT (SELECT count(*) FROM alembic_version) = 1
+     AND (SELECT count(*) FROM product) > 0
+     AND (SELECT count(*) FROM staff_user) > 0
+     AND (SELECT count(*) FROM orders) >= 0
+     AND (SELECT count(*) FROM history_sale) >= 0
+     AND (SELECT count(*) FROM loyalty_card) >= 0")"
+[ "$CHECK" = "t" ] || { echo "ÉCHEC : copie restaurée incomplète (menu, staff ou schéma)" >&2; exit 1; }
+echo "Contrôles : schéma, menu, staff, commandes, historique, fidélité : OK"
+
+if [ "$CI_MODE" != "true" ]; then
+  echo "Contenu restauré :"
+  docker exec "$NAME" psql -U postgres -At -F ' : ' -c "
+    SELECT 'commandes', count(*) FROM orders
+    UNION ALL SELECT 'ventes historiques', count(*) FROM history_sale
+    UNION ALL SELECT 'cartes de fidélité', count(*) FROM loyalty_card
+    UNION ALL SELECT 'comptes du staff', count(*) FROM staff_user
+    UNION ALL SELECT 'version du schéma', (SELECT count(*) FROM alembic_version)" |
+    sed 's/^/    /'
+fi
 echo "Restauration réussie. Copie et conteneur effacés."

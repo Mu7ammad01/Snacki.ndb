@@ -1,0 +1,39 @@
+# Test de restauration mensuel (ADR 0013) : la dernière sauvegarde de production est restaurée
+# dans un PostgreSQL jetable sur la machine GitHub, contrôlée, puis effacée avec la machine.
+# En cas d'échec, GitHub envoie un e-mail. Accès Google : compte snacki-restore-test, lecture des
+# sauvegardes seulement, par un pool d'identité séparé (infra/gcp/setup-restore-ci.sh).
+name: restore-test
+
+on:
+  schedule:
+    - cron: "17 6 1 * *" # le 1er de chaque mois à 6 h 17 (heure de Nouadhibou)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-test
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    name: restauration de la dernière sauvegarde
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # jeton OIDC pour Google, rien d'autre
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_RESTORE_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_RESTORE_SA }}
+      - name: Restaurer et contrôler
+        env:
+          GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+        run: ./infra/gcp/restore-test.sh
