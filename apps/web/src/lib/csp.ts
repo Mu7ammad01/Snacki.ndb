@@ -11,6 +11,7 @@ export function buildCsp(nonce: string, dev: boolean): string {
     "font-src 'self'",
     "connect-src 'self'",
     "manifest-src 'self'",
+    "worker-src 'self'", // service worker /sw.js (J11) : 'strict-dynamic' ignore 'self' dans script-src
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

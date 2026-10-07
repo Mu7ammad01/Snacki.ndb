@@ -1,6 +1,6 @@
 {
   "name": "snacki-web",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "PWA client de Snacki (Next.js) : menu, commande, suivi",
   "engines": {
@@ -11,7 +11,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "next": "16.3.8",
@@ -20,6 +21,7 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "22.20.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
