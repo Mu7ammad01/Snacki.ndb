@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Back, Close, Leaf, Minus, Plus, Wa } from "@/components/Icons";
 import { type Cart, cartCount, estimateTotal, sanitizeCart, setQty, toItems } from "@/lib/cart";
-import { CONTACT, PAYMENTS, T, ZONES, fmt } from "@/lib/i18n";
+import { CONTACT, PAYMENTS, T, WALLETS, ZONES, fmt, isWallet } from "@/lib/i18n";
+import { initialLang } from "@/lib/lang";
 import { applyLang, store } from "@/lib/storage";
 import { trackingPath } from "@/lib/token";
 import type { Category, Lang, OrderCreated, OrderRequest, PaymentMethod, Product } from "@/lib/types";
@@ -35,12 +36,14 @@ export default function Shop({ products }: { products: Product[] | null }) {
 
   // Préférences relues après l'affichage (le serveur ne connaît pas le localStorage).
   useEffect(() => {
-    setLang(store.get<Lang>("lang", "fr") === "ar" ? "ar" : "fr");
+    setLang(initialLang(store.get<string | null>("lang_choice", null), navigator.languages));
     setCart(sanitizeCart(store.get("cart", {}), new Set(byId.keys())));
     const saved = store.get<Partial<Form>>("client", {});
     setForm((f) => ({ ...f, name: String(saved.name ?? ""), phone: String(saved.phone ?? ""), zone: String(saved.zone ?? "ndb"), landmark: String(saved.landmark ?? "") }));
   }, [byId]);
-  useEffect(() => { applyLang(lang); store.set("lang", lang); }, [lang]);
+  useEffect(() => { applyLang(lang); }, [lang]);
+  // Seul un choix explicite est mémorisé : sinon, l'app continue de suivre le téléphone.
+  const chooseLang = (l: Lang) => { setLang(l); store.set("lang_choice", l); };
   useEffect(() => { store.set("cart", cart); }, [cart]);
   useEffect(() => { document.body.style.overflow = step ? "hidden" : ""; }, [step]);
 
@@ -116,9 +119,10 @@ export default function Shop({ products }: { products: Product[] | null }) {
       <div className="app">
         <header className="top">
           <img className="logo" src="/img/logo.jpg" alt="Snacki — عصائر و ديسيرات" width={118} height={79} />
+          <a className="wa-top" href={waLink(t.waHello)} target="_blank" rel="noopener noreferrer" aria-label={t.waButton}><Wa /><span>WhatsApp</span></a>
           <div className="lang" role="group" aria-label="Langue / اللغة">
-            <button type="button" aria-pressed={lang === "fr"} onClick={() => setLang("fr")}>FR</button>
-            <button type="button" aria-pressed={lang === "ar"} onClick={() => setLang("ar")}>عربي</button>
+            <button type="button" aria-pressed={lang === "fr"} onClick={() => chooseLang("fr")}>FR</button>
+            <button type="button" aria-pressed={lang === "ar"} onClick={() => chooseLang("ar")}>عربي</button>
           </div>
         </header>
 
@@ -260,10 +264,14 @@ export default function Shop({ products }: { products: Product[] | null }) {
                   <div className="field">
                     <div className="lab" id="l-pay">{t.payment}</div>
                     <div className="chips" role="radiogroup" aria-labelledby="l-pay">
-                      {PAYMENTS.map((p) => (
-                        <button key={p.id} type="button" role="radio" className="opt" aria-checked={form.pay === p.id} onClick={() => update({ pay: p.id })}><span>{p[lang]}</span></button>
-                      ))}
+                      <button type="button" role="radio" className="opt" aria-checked={form.pay === "cash"} onClick={() => update({ pay: "cash" })}><span>{PAYMENTS[0][lang]}</span></button>
+                      <button type="button" role="radio" className="opt" aria-checked={isWallet(form.pay)} onClick={() => update({ pay: isWallet(form.pay) ? form.pay : WALLETS[0].id })}><span>{t.wallet}</span></button>
                     </div>
+                    {isWallet(form.pay) && (
+                      <select aria-label={t.walletPick} value={form.pay} onChange={(e) => update({ pay: e.target.value })}>
+                        {WALLETS.map((w) => <option key={w.id} value={w.id}>{w[lang]}</option>)}
+                      </select>
+                    )}
                   </div>
                   <div className="field">
                     <label htmlFor="f-note">{t.note}</label>
