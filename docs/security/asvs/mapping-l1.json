@@ -313,14 +313,16 @@
     "raison": "Serveur d'autorisation tiers ; Snacki ne demande pas de jeton de rafraîchissement."
   },
   "V11.3.1": {
-    "statut": "prévu",
-    "jour": "J12",
-    "controle": "Aucun chiffrement maison : TLS et bibliothèques reconnues uniquement ; règle Semgrep sur les modes ECB."
+    "statut": "fait",
+    "jour": "J15",
+    "controle": "Aucun chiffrement maison : TLS (Google, Neon) et bibliothèques reconnues ; Bandit (B304, B305) et CodeQL signalent les algorithmes et modes faibles à chaque PR.",
+    "preuve": ".pre-commit-config.yaml (bandit), .github/workflows/codeql.yml"
   },
   "V11.3.2": {
-    "statut": "prévu",
-    "jour": "J14",
-    "controle": "Export de sauvegarde chiffré en AES-GCM (bibliothèque cryptography)."
+    "statut": "fait",
+    "jour": "J15",
+    "controle": "Données au repos chiffrées en AES-256 par Google Cloud Storage (sauvegardes) et Neon ; transport en TLS ; sessions signées HS256 (PyJWT). Aucun algorithme choisi à la main.",
+    "preuve": "infra/gcp/setup-backup.sh (bucket chiffré par Google), apps/api/src/snacki_api/auth.py (HS256)"
   },
   "V11.4.1": {
     "statut": "fait",

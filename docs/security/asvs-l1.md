@@ -2,7 +2,7 @@
 
 Fichier généré par `scripts/asvs_checklist.py` à partir de `docs/security/asvs/mapping-l1.json` : ne pas modifier à la main.
 
-**70 exigences** : 45 fait · 2 prévu · 1 à vérifier · 22 N/A.
+**70 exigences** : 47 fait · 0 prévu · 1 à vérifier · 22 N/A.
 
 Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'original.
 
@@ -119,8 +119,8 @@ Texte des exigences : OWASP ASVS 5.0.0 (CC BY-SA 4.0), en anglais comme l'origin
 
 | ID | Exigence | Statut | Jour | Contrôle ou raison |
 | --- | --- | --- | --- | --- |
-| V11.3.1 | Verify that insecure block modes (e.g., ECB) and weak padding schemes (e.g., PKCS#1 v1.5) are not used. | prévu | J12 | Aucun chiffrement maison : TLS et bibliothèques reconnues uniquement ; règle Semgrep sur les modes ECB. |
-| V11.3.2 | Verify that only approved ciphers and modes such as AES with GCM are used. | prévu | J14 | Export de sauvegarde chiffré en AES-GCM (bibliothèque cryptography). |
+| V11.3.1 | Verify that insecure block modes (e.g., ECB) and weak padding schemes (e.g., PKCS#1 v1.5) are not used. | fait | J15 | Aucun chiffrement maison : TLS (Google, Neon) et bibliothèques reconnues ; Bandit (B304, B305) et CodeQL signalent les algorithmes et modes faibles à chaque PR. Preuve : `.pre-commit-config.yaml (bandit), .github/workflows/codeql.yml`. |
+| V11.3.2 | Verify that only approved ciphers and modes such as AES with GCM are used. | fait | J15 | Données au repos chiffrées en AES-256 par Google Cloud Storage (sauvegardes) et Neon ; transport en TLS ; sessions signées HS256 (PyJWT). Aucun algorithme choisi à la main. Preuve : `infra/gcp/setup-backup.sh (bucket chiffré par Google), apps/api/src/snacki_api/auth.py (HS256)`. |
 | V11.4.1 | Verify that only approved hash functions are used for general cryptographic use cases, including digital signatures, HMAC, KDF, and random bit generation. … | fait | J6 | SHA-256 et HMAC-SHA-256 uniquement (jeton de suivi, PKCE S256, signatures HS256) ; Bandit (B303, B324) dans pre-commit et la CI. Preuve : `apps/api/src/snacki_api/auth.py, .pre-commit-config.yaml`. |
 
 ## V12 · Secure Communication

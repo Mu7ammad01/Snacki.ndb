@@ -1,10 +1,17 @@
 # Snacki
 
-PWA de commande et de gestion pour **Snacki**, un snack de jus et desserts à Nouadhibou (Mauritanie) : les clients commandent en français ou en arabe directement dans l'app (WhatsApp reste un lien de contact), le staff tient la caisse et suit les commandes en direct, les associés pilotent les ventes. Une IA prévoit les achats de fruits et transforme les messages WhatsApp en commandes.
+[![ci](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/ci.yml/badge.svg)](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/ci.yml)
+[![codeql](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/codeql.yml/badge.svg)](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/codeql.yml)
+[![deploy](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/deploy.yml/badge.svg)](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/deploy.yml)
+[![restore-test](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/restore-test.yml/badge.svg)](https://github.com/Mu7ammad01/Snacki.ndb/actions/workflows/restore-test.yml)
 
-Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à chaque commit, du poste du développeur jusqu'à la production.
+Application en production pour **Snacki**, un snack de jus et de desserts à Nouadhibou (Mauritanie) : **[snackindb.com](https://snackindb.com)**.
 
-> État : **J8 / 15** · En ligne sur Cloud Run (staging puis production approuvée). Connexion du staff (J6), caisse (J7). Pilotage : chiffre d'affaires du jour, de la période et cumulé, produits les plus vendus, moyens de paiement, historique Excel importé ; coordonnées des clients anonymisées après 90 jours ([ADR 0010](docs/adr/0010-pilotage-et-historique.md)). Fidélité : carte à QR unique, 5 achats = 1 commande offerte, tampons enregistrés dans l'app ([ADR 0011](docs/adr/0011-fidelite.md)).
+- **Clients** : menu en français ou en arabe (langue du téléphone), commande à emporter ou en livraison, suivi en direct, carte de fidélité à QR. Installable sur le téléphone.
+- **Caisse** : commandes en temps réel avec son et notification, vente au comptoir, encaissement (espèces ou wallet), fidélité, assistant IA qui transforme un message WhatsApp en vente.
+- **Gérante** : chiffre d'affaires, produits les plus vendus, prévisions sur 7 jours, résumé du jour, historique Excel importé.
+
+> **Version 1.0** · 15 jours de construction (J1 à J15), chaque jour testé, scanné, déployé en staging puis en production. Les 28 menaces du modèle de sécurité sont traitées. Historique : [CHANGELOG](CHANGELOG.md).
 
 ## Architecture
 
@@ -12,41 +19,47 @@ Le projet suit une démarche **DevSecOps** : la sécurité est contrôlée à ch
 flowchart LR
   C[Client] -- HTTPS --> W[web · Next.js]
   S[Staff] -- HTTPS --> W
-  W -- "REST + JWT (IAM)" --> A[api · FastAPI]
-  A --> DB[(PostgreSQL · Neon)]
+  D[Cloudflare · DNS seul] -. snackindb.com .-> W
+  W -- "jeton d'identité Google" --> A[api · FastAPI, privée]
+  A -- SQL paramétré --> DB[(PostgreSQL · Neon)]
   A --> G[Google OAuth 2.0]
-  A --> L[API Gemini]
+  A -- textes masqués --> L[API Gemini]
+  B[Sauvegarde 3 h] --> GCS[(Cloud Storage · 30 jours)]
 ```
 
 | Brique | Technologie |
 | --- | --- |
-| Front | TypeScript, Next.js, Tailwind (PWA FR/AR) |
+| Front | TypeScript, Next.js 16, React 19, PWA FR/AR |
 | API | Python, FastAPI, Pydantic |
 | Données | PostgreSQL (Neon), SQLAlchemy, Alembic |
-| IA | scikit-learn (prévision), Gemini (assistant de commande) |
-| Identité | OAuth 2.0 Google, JWT, rôles |
-| Hébergement | Docker, Google Cloud Run |
-| CI/CD | GitHub Actions, portes DevSecOps |
+| IA | Gemini (assistant de commande, résumé vérifié), prévisions en Python |
+| Identité | OAuth 2.0 Google avec PKCE, sessions signées, rôles |
+| Hébergement | Docker, Google Cloud Run ; domaine et DNS chez Cloudflare |
+| CI/CD | GitHub Actions, déploiement sans clé (Workload Identity Federation) |
 
 ## Sécurité
 
-| Porte | Outil | Active depuis |
-| --- | --- | --- |
-| 1 · Secrets | gitleaks (poste + CI), protection des pushs GitHub | J1 |
-| 2 · Qualité et sécurité du code | ruff (règles `S`), Bandit | J1 |
-| Chaîne d'approvisionnement | actions épinglées par SHA, Dependabot | J1 |
-| 3 · Tests de l'API et du front | pytest sur PostgreSQL (couverture ≥ 80 %, migrations réversibles) ; Vitest, types et build Next.js | J2, J4 |
-| 4 · Tests d'autorisation | pytest : accès croisé aux commandes (anti-BOLA) | J3 |
-| 5 · Analyse du code (SAST) | CodeQL (Python, TypeScript), ruff `S`, Bandit | J5 |
-| 6 · Dépendances (SCA) | pip-audit, npm audit, Dependabot | J5 |
-| 7 · Images Docker | non root, aucun fichier inutile, Trivy | J5 |
-| 8 · IA | jeu d'évaluation de l'assistant | J9 |
-| 9 · Application en ligne | OWASP ZAP | J12 |
+Démarche **DevSecOps** : la sécurité est un contrôle automatique du pipeline, comme les tests. Rien n'atteint la production sans 9 portes vertes, une image signée par la CI et une approbation humaine.
 
-- [Modèle de menaces (STRIDE, 24 menaces)](docs/security/threat-model.md)
-- [Suivi OWASP ASVS 5.0 niveau 1 (70 exigences)](docs/security/asvs-l1.md)
-- [Décisions d'architecture](docs/adr/)
-- [Politique de sécurité et délais de correction](SECURITY.md)
+| Porte | Outils |
+| --- | --- |
+| 1 · Secrets | gitleaks (poste + CI), protection des pushs GitHub |
+| 2 · Qualité | ruff, Bandit, mypy, hooks pre-commit |
+| 3 · Tests | pytest sur PostgreSQL (couverture ≥ 80 %), Vitest, Playwright de bout en bout |
+| 4 · Autorisations | tests des rôles, des sessions et des liens de suivi (anti-BOLA) |
+| 5 · Analyse du code | CodeQL (Python, TypeScript) |
+| 6 · Dépendances | pip-audit, npm audit, Dependabot |
+| 7 · Images | non root, Trivy, SBOM CycloneDX, signature cosign vérifiée avant chaque déploiement |
+| 8 · IA | jeu d'évaluation de l'assistant ; chiffres de l'IA vérifiés ; quota quotidien |
+| 9 · Application en ligne | OWASP ZAP sur staging à chaque déploiement |
+
+- [Synthèse de sécurité v1.0](docs/security/README.md)
+- [Modèle de menaces (STRIDE, 28 menaces, toutes traitées)](docs/security/threat-model.md)
+- [Audit J13 et scan ZAP complet](docs/security/audit-j13.md)
+- [Procédure d'incident](docs/security/incident.md)
+- [Suivi OWASP ASVS 5.0 niveau 1](docs/security/asvs-l1.md)
+- [Décisions d'architecture (17 ADR)](docs/adr/)
+- [Politique de sécurité](SECURITY.md)
 
 ## Démarrer
 
@@ -71,7 +84,7 @@ Chaque fusion sur `main` déclenche `.github/workflows/deploy.yml` après une CI
 | `snacki-web-staging`, `snacki-web-prod` | public (HTTPS) |
 | `snacki-api-staging`, `snacki-api-prod` | privé : seul le serveur web du même environnement peut l'appeler |
 
-Mise en place, une seule fois : `./infra/gcp/setup-deploy.sh <projet> <propriétaire/dépôt>`, puis `./infra/gcp/setup-auth.sh` pour la connexion du staff ([ADR 0008](docs/adr/0008-connexion-du-staff.md)).
+Mise en place, une seule fois : `./infra/gcp/setup-deploy.sh <projet> <propriétaire/dépôt>`, puis `./infra/gcp/setup-auth.sh` pour la connexion du staff ([ADR 0008](docs/adr/0008-connexion-du-staff.md)). Domaine : `setup-domain.sh` ; sauvegardes : `setup-backup.sh` et `setup-restore-ci.sh` ; assistant IA : `setup-gemini.sh`.
 
 ## Organisation du dépôt
 
