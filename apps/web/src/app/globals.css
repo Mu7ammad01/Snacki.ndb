@@ -278,3 +278,14 @@ a.staff-link:hover{outline:2px solid var(--sun)}
 .stamps li{width:48px;height:48px;border-radius:50%;border:2px dashed var(--ink-3);display:grid;place-items:center;font-weight:800;color:var(--ink-3)}
 .stamps li.on{border:0;background:var(--sun);color:var(--on-sun)}
 .stamps li.gift{width:auto;padding:0 14px;border-radius:999px;border:0;background:var(--ink);color:var(--paper)}
+
+/* Réunion 5 : bouton WhatsApp toujours visible (demande 12), choix du wallet (demande 7). */
+.wa-top{display:inline-flex;align-items:center;gap:6px;margin-inline-start:auto;padding:7px 12px;border-radius:999px;border:1.5px solid var(--wa);color:var(--wa);font-weight:700;font-size:14px;text-decoration:none}
+.wa-top svg{width:18px;height:18px}
+@media (max-width:370px){.wa-top span{display:none}}
+.field .chips + select{margin-top:10px}
+.pay-wallet{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pay-wallet select{border:1.5px solid var(--line);border-radius:12px;padding:8px;background:var(--surface)}
+/* Réunion 5 (demande 3) : sur tablette et ordinateur, le menu occupe la largeur de l'écran. */
+@media (min-width:820px){.app:not(.staff){max-width:960px}.app:not(.staff) .grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1200px){.app:not(.staff){max-width:1140px}.app:not(.staff) .grid{grid-template-columns:repeat(4,minmax(0,1fr))}}

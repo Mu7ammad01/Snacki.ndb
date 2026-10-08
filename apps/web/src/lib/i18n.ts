@@ -19,6 +19,10 @@ export const PAYMENTS = [
   { id: "bamis", fr: "Bamis Digital", ar: "باميس ديجيتال" },
 ] as const;
 
+/** Réunion 5 (demande 7) : le client choisit « Espèces » ou « Wallet », puis son wallet. */
+export const WALLETS = PAYMENTS.filter((p) => p.id !== "cash");
+export const isWallet = (id: string) => WALLETS.some((w) => w.id === id);
+
 const fr = {
   introTitle: "Jus frais et délices, prêts en quelques minutes",
   introText: "À emporter ou livrés à Nouadhibou et Cansado.",
@@ -39,7 +43,9 @@ const fr = {
   zone: "Quartier", landmark: "Adresse ou repère", landmarkPh: "Ex. près de la mosquée, maison bleue",
   landmarkErr: "Indiquez un repère pour le livreur (3 à 100 caractères).",
   feeNote: "Les frais de livraison s’affichent dans le suivi dès que le snack accepte la commande.",
-  payment: "Paiement", note: "Remarque (facultatif)", notePh: "Ex. moins sucré, sans lait…",
+  payment: "Paiement", wallet: "Wallet", walletPick: "Choisir le wallet",
+  waButton: "Écrire au snack sur WhatsApp", waHello: "Bonjour Snacki, j’ai une question :",
+  note: "Remarque (facultatif)", notePh: "Ex. moins sucré, sans lait…",
   orderNo: "Votre numéro de commande", total: "Total",
   track: "Suivre ma commande",
   sentToShop: "Votre commande est arrivée au snack. Suivez-la en direct : délai, frais de livraison et statut.",
@@ -84,7 +90,9 @@ const ar: Dict = {
   zone: "الحي", landmark: "العنوان أو علامة مميزة", landmarkPh: "مثال: قرب المسجد، المنزل الأزرق",
   landmarkErr: "أدخل علامة مميزة لعامل التوصيل (من 3 إلى 100 حرف).",
   feeNote: "يظهر سعر التوصيل في صفحة التتبع بمجرد قبول المحل للطلب.",
-  payment: "طريقة الدفع", note: "ملاحظة (اختياري)", notePh: "مثال: سكر أقل، بدون حليب…",
+  payment: "طريقة الدفع", wallet: "محفظة إلكترونية", walletPick: "اختر المحفظة",
+  waButton: "راسل المحل عبر واتساب", waHello: "السلام عليكم سناكي، عندي سؤال:",
+  note: "ملاحظة (اختياري)", notePh: "مثال: سكر أقل، بدون حليب…",
   orderNo: "رقم طلبك", total: "المجموع",
   track: "تتبع طلبي",
   sentToShop: "وصل طلبك إلى المحل. تابعه مباشرة: وقت التجهيز وسعر التوصيل والحالة.",

@@ -116,3 +116,10 @@ export function cardFrom(text: string): string | null {
   const raw = m ? m[1] + m[2] : text.toUpperCase().replace(/[\s-]/g, "");
   return /^[0-9A-Z]{8}$/.test(raw) ? `FID-${raw.slice(0, 4)}-${raw.slice(4)}` : null;
 }
+
+/** Texte de la notification : numéro, prénom et total de chaque nouvelle commande (demande 10). */
+export function arrivalText(orders: { number: string; customer_name: string; grand_total_mru: number }[]): string {
+  const lines = orders.slice(0, 3).map((o) => `${o.number} · ${o.customer_name} · ${o.grand_total_mru} MRU`);
+  if (orders.length > 3) lines.push(`+ ${orders.length - 3} autre(s)`);
+  return lines.join("\n");
+}

@@ -7,6 +7,7 @@ import {
   PAY_LABEL,
   STATUS_LABEL,
   actionsFor,
+  arrivalText,
   cardFrom,
   columnOf,
   hhmm,
@@ -21,6 +22,22 @@ import type { AssistantResult, CaisseOrder, LoyaltyCard, PaymentMethod, Product 
 
 const REFRESH_MS = 5_000;
 const PAYS = Object.keys(PAY_LABEL) as PaymentMethod[];
+/** Réunion 5 (demande 7) : « Espèces » ou « Wallet », puis le wallet dans une liste. */
+const WALLET_PAYS = PAYS.filter((m) => m !== "cash");
+
+function WalletPay({ busy, onPay }: { busy: boolean; onPay: (m: PaymentMethod) => void }) {
+  const [wallet, setWallet] = useState<PaymentMethod>(WALLET_PAYS[0]);
+  return (
+    <div className="pay-wallet">
+      <button type="button" className="opt" disabled={busy} onClick={() => onPay("cash")}>Espèces</button>
+      <select aria-label="Wallet" value={wallet} onChange={(e) => setWallet(e.target.value as PaymentMethod)}>
+        {WALLET_PAYS.map((m) => <option key={m} value={m}>{PAY_LABEL[m]}</option>)}
+      </select>
+      <button type="button" className="opt" disabled={busy} onClick={() => onPay(wallet)}>Wallet</button>
+    </div>
+  );
+}
+
 type Panel = null | { id: number; mode: "accept" | "refuse" | "cancel" | "pay" | "stamp" | "reward" };
 
 /** Bip court généré par le navigateur (aucun fichier son à charger). */
@@ -61,8 +78,11 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
       known.current = new Set(data.orders.map((o) => o.id));
       if (fresh.length) {
         beep(audio.current);
+        const arrived = data.orders.filter((o) => fresh.includes(o.id));
+        const body = arrivalText(arrived);
+        setMsg({ text: `Nouvelle commande : ${body.replaceAll("\n", " — ")}`, bad: false });
         if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-          new Notification("Snacki · nouvelle commande", { body: `${fresh.length} commande(s) à accepter` });
+          new Notification(fresh.length > 1 ? `Snacki · ${fresh.length} nouvelles commandes` : "Snacki · nouvelle commande", { body, tag: "snacki-commande" });
         }
       }
       setOrders(data.orders);
@@ -188,9 +208,7 @@ export default function CaisseBoard({ me, products }: { me: StaffMe; products: P
 
               {panel?.id === o.id && panel.mode === "accept" && <AcceptForm order={o} busy={busy} onSubmit={(b) => act(o, "accept", b)} />}
               {panel?.id === o.id && panel.mode === "pay" && (
-                <div className="chips">
-                  {PAYS.map((m) => <button key={m} className="opt" disabled={busy} onClick={() => act(o, "pay", { method: m })}>{PAY_LABEL[m]}</button>)}
-                </div>
+                <WalletPay busy={busy} onPay={(m) => act(o, "pay", { method: m })} />
               )}
               {panel?.id === o.id && (panel.mode === "stamp" || panel.mode === "reward") && (
                 <CardForm withPhone={panel.mode === "stamp"} label={panel.mode === "stamp" ? "Donner le tampon" : "Offrir (100 MRU au plus)"} busy={busy}
@@ -275,9 +293,17 @@ function CounterForm({ products, busy, onSubmit, initial = {} }: { products: Pro
         <input id="counter-name" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="chips">
-        {PAYS.map((m) => <button key={m} type="button" className="opt" role="radio" aria-checked={paid === m} onClick={() => setPaid(m)}>{PAY_LABEL[m]}</button>)}
+        <button type="button" className="opt" role="radio" aria-checked={paid === "cash"} onClick={() => setPaid("cash")}>Espèces</button>
+        <button type="button" className="opt" role="radio" aria-checked={paid !== "" && paid !== "cash"} onClick={() => setPaid(paid !== "" && paid !== "cash" ? paid : WALLET_PAYS[0])}>Wallet</button>
         <button type="button" className="opt" role="radio" aria-checked={paid === ""} onClick={() => setPaid("")}>Plus tard</button>
       </div>
+      {paid !== "" && paid !== "cash" && (
+        <div className="field">
+          <select aria-label="Wallet" value={paid} onChange={(e) => setPaid(e.target.value as PaymentMethod)}>
+            {WALLET_PAYS.map((m) => <option key={m} value={m}>{PAY_LABEL[m]}</option>)}
+          </select>
+        </div>
+      )}
       <button className="primary" type="submit" disabled={busy || items.length === 0}>Enregistrer · ≈ {estimate} MRU</button>
     </form>
   );
