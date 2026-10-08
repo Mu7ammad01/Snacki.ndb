@@ -10,9 +10,9 @@ Décisions du 8 octobre : le lot A est livré avant la v1.0 ; le lot B forme la 
 | 7 | Paiement : Espèces ou Wallet | 5 boutons | A | Fait (client et caisse) ; le wallet précis reste enregistré pour le pilotage |
 | 10 | Notification détaillée de commande | Son + notification « n commandes » | A | Fait : numéro, prénom, total, bandeau visible |
 | 12 | Bouton WhatsApp | Seulement après la commande | A | Fait : bouton toujours visible en haut |
-| 1 | Nouveau design du pilotage, graphiques, chiffres clés en haut | Chiffres clés, barres par jour, top produits | B | v1.1 |
-| 2 | Rapport (période, PDF, Excel, date de génération) | Aucun | B | v1.1 |
-| 4 | Page Historique filtrable (date, personne, statut) | Journal d'audit sans écran | B | v1.1 |
+| 1 | Nouveau design du pilotage, graphiques, chiffres clés en haut | Chiffres clés, barres par jour, top produits | B | Fait (v1.1) : courbe du chiffre d'affaires, colonnes des commandes par jour, chiffre clé principal mis en avant |
+| 2 | Rapport (période, PDF, Excel, date de génération) | Aucun | B | Fait (v1.1) : bouton « Générer un rapport », période au choix, Excel (API) et PDF (impression), date et auteur |
+| 4 | Page Historique filtrable (date, personne, statut) | Journal d'audit sans écran | B | Fait (v1.1) : filtres par période, personne et type d'action (dont refus et annulations) |
 | 11 | Gestion du menu (ajouter, modifier, supprimer, image) | Menu fixé par migration | C | v1.2 |
 | 9 | Gestion de stock par ingrédient, alertes | Aucun | C | v1.2 (après le menu : les recettes s'appuient sur les produits) |
 | 8 | Carte de fidélité créée à la première commande | Cartes QR imprimées | C | v1.2 |

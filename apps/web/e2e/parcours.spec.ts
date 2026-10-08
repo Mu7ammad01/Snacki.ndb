@@ -125,3 +125,31 @@ test("PWA : installable, page hors connexion, aucune page en cache", async ({ pa
     expect(path, "seuls des fichiers publics sont en cache").toMatch(/^\/(offline\.(html|css)|_next\/static\/|img\/|icons\/|fonts\/)/);
   }
 });
+
+test("v1.1 · gérante : graphiques, rapport Excel et PDF, historique filtrable", async ({ page, context, request }) => {
+  const prenom = unique("Zeina");
+  await commander(page, prenom);
+  await connecter(context, "gerante");
+
+  await page.goto("/pilotage");
+  await expect(page.getByRole("img", { name: "Chiffre d'affaires par jour, en MRU" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Nombre de commandes par jour" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Générer un rapport" }).click();
+  await expect(page.getByRole("heading", { name: "Rapport Snacki" })).toBeVisible();
+  await expect(page.getByText(/^Généré le /)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enregistrer en PDF" })).toBeVisible();
+  const href = (await page.getByRole("link", { name: "Télécharger Excel" }).getAttribute("href")) ?? "";
+  const xlsx = await page.request.get(href);
+  expect(xlsx.status()).toBe(200);
+  expect(xlsx.headers()["content-type"]).toContain("spreadsheetml");
+  expect((await xlsx.body()).subarray(0, 2).toString()).toBe("PK"); // un vrai fichier .xlsx (zip)
+
+  await page.goto("/historique");
+  await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
+  await page.getByLabel("Type d'action").selectOption("connexions");
+  await page.getByRole("button", { name: "Filtrer" }).click();
+  await expect(page).toHaveURL(/group=connexions/);
+
+  expect((await request.get("/api/pilotage/rapport?start=x&end=y")).status()).toBe(422);
+});

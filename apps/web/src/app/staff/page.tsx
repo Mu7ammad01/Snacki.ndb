@@ -46,6 +46,12 @@ export default async function StaffHome() {
             <p className="muted">Chiffre d&apos;affaires, produits les plus vendus, moyens de paiement, historique.</p>
           </a>
         )}
+        {show.pilotage && (
+          <a className="track staff-link" href="/historique">
+            <h2>Historique →</h2>
+            <p className="muted">Qui a fait quoi et quand : commandes, encaissements, refus, fidélité, équipe.</p>
+          </a>
+        )}
       </section>
 
       {show.equipe && <TeamAdmin me={me} initial={team} />}

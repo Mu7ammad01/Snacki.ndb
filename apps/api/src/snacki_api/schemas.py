@@ -289,6 +289,7 @@ class DayPoint(BaseModel):
     app_mru: int
     comptoir_mru: int
     historique_mru: int
+    orders: int  # v1.1 : commandes du jour (app, comptoir et historique)
 
 
 class TopItem(BaseModel):
@@ -364,6 +365,31 @@ class ResumeOut(BaseModel):
     engine: Literal["gemini", "modele"]
     warnings: list[str]
     ai_available: bool  # bouton « Reformuler avec l'IA » proposé ou non
+
+
+# --- Historique (v1.1, réunion 5) -----------------------------------------------------------
+
+
+class HistoryEntry(BaseModel):
+    at: datetime
+    actor: str
+    action: str
+    label: str
+    group: str
+    target: str | None
+    detail: str
+
+
+class HistoryPerson(BaseModel):
+    id: int
+    name: str
+
+
+class HistoryOut(BaseModel):
+    entries: list[HistoryEntry]
+    people: list[HistoryPerson]
+    groups: dict[str, str]
+    truncated: bool
 
 
 # --- Fidélité (J8 bis) ---------------------------------------------------------------------

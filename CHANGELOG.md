@@ -1,5 +1,14 @@
 # Historique des versions
 
+## v1.1 · octobre 2026
+
+Demandes de la gérante (réunion 5, lot B).
+
+- **Pilotage** : courbe du chiffre d'affaires et colonnes des commandes par jour, chiffre clé principal mis en avant, boutons « Générer un rapport » et « Historique ».
+- **Rapport** : période au choix (jour, semaine, mois, dates), téléchargement Excel (4 onglets) ou PDF (impression), date de génération et auteur ; chaque téléchargement est tracé.
+- **Historique** : toutes les actions de l'équipe, filtrables par période, personne et type d'action (500 dernières).
+- Sécurité : réservé à la gérante et à l'admin ; Excel protégé contre l'injection de formules.
+
 Chaque jour du plan est un tag Git (`j1` … `j14`), déployé en staging puis en production après approbation.
 
 ## v1.0 · 8 octobre 2026
@@ -28,5 +37,4 @@ Première version complète. 28 menaces sur 28 traitées, 9 portes de sécurité
 
 ## Prochaines versions
 
-- **v1.1** : nouveau pilotage avec graphiques, rapport Excel et PDF, page Historique filtrable.
 - **v1.2** : gestion du menu, stock par ingrédient, carte de fidélité créée à la première commande.
