@@ -1,0 +1,51 @@
+# Audit J13 : scan OWASP ZAP complet (actif) de STAGING, lancé à la main. Jamais la production :
+# l'adresse doit être une adresse run.app de staging, sinon le job s'arrête. Le scan actif envoie
+# des requêtes de test à staging (il peut y laisser quelques commandes de test, base de staging).
+name: zap-full
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zap-full
+  cancel-in-progress: false
+
+jobs:
+  zap:
+    name: zap complet (staging)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan complet de staging
+        env:
+          TARGET: ${{ vars.STAGING_WEB_URL }}
+        run: |
+          [[ "$TARGET" =~ ^https://snacki-web-staging-[a-z0-9-]+\.[a-z0-9-]+\.run\.app$ ]] \
+            || { echo "STAGING_WEB_URL doit être l'adresse run.app de snacki-web-staging" >&2; exit 1; }
+          work="$(mktemp -d)"
+          cp .zap/rules.tsv "$work/"
+          chmod -R a+rwX "$work"
+          docker run --rm -v "${work}:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py -t "$TARGET" -c rules.tsv -m 5 -T 40 -I -r rapport.html -J rapport.json || code=$?
+          echo "## Scan ZAP complet de staging" >> "$GITHUB_STEP_SUMMARY"
+          python3 - "$work/rapport.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, sys
+          from collections import Counter
+          data = json.load(open(sys.argv[1]))
+          alerts = [a for s in data.get("site", []) for a in s.get("alerts", [])]
+          levels = Counter(a.get("riskdesc", "?").split(" ")[0] for a in alerts)
+          print("| Niveau | Alertes |\n| --- | --- |")
+          for level in ("High", "Medium", "Low", "Informational"):
+              print(f"| {level} | {levels.get(level, 0)} |")
+          print("\n| Alerte | Niveau | URLs |\n| --- | --- | --- |")
+          for a in sorted(alerts, key=lambda a: -int(a.get("riskcode", 0))):
+              print(f"| {a.get('name')} | {a.get('riskdesc')} | {a.get('count')} |")
+          PY
+          exit "${code:-0}"
