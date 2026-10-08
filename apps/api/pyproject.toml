@@ -41,5 +41,5 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = ["reportlab.*", "qrcode.*", "pandas.*", "defusedxml.*"]
+module = ["reportlab.*", "qrcode.*", "pandas.*", "defusedxml.*", "openpyxl.*"]
 ignore_missing_imports = true

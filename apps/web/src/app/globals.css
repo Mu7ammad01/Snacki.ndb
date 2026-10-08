@@ -289,3 +289,36 @@ a.staff-link:hover{outline:2px solid var(--sun)}
 /* Réunion 5 (demande 3) : sur tablette et ordinateur, le menu occupe la largeur de l'écran. */
 @media (min-width:820px){.app:not(.staff){max-width:960px}.app:not(.staff) .grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (min-width:1200px){.app:not(.staff){max-width:1140px}.app:not(.staff) .grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* v1.1 (réunion 5) : pilotage plus clair, graphiques, rapport imprimable. */
+.chart{display:block;width:100%;height:auto;margin-top:6px}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .tick{fill:var(--ink-3);font-size:11px;font-variant-numeric:tabular-nums}
+.chart .area{fill:var(--sun);fill-opacity:.22}
+.chart .line{fill:none;stroke:var(--sun-deep, var(--ink));stroke-width:2.5;stroke-linejoin:round}
+.chart .dot{fill:var(--surface);stroke:var(--sun-deep, var(--ink));stroke-width:2}
+.chart .col{fill:var(--leaf)}
+.charts{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.charts .track{margin-top:0}
+.kpis div:first-child{background:var(--sun);color:var(--ink)}
+.kpis div:first-child span{color:var(--ink)}
+.head-actions{display:flex;flex-wrap:wrap;gap:8px}
+.head-actions a{text-decoration:none}
+.report-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-end}
+.report-meta{font-size:13px;color:var(--ink-3)}
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table th,.table td{text-align:start;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.table th{font-size:12px;color:var(--ink-3);font-weight:700}
+.table td.num{text-align:end;font-variant-numeric:tabular-nums}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:8px 0 14px}
+.filters label{display:grid;gap:4px;font-size:13px;font-weight:700}
+.filters input,.filters select{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:8px;font:inherit;color:var(--ink)}
+.scroll-x{overflow-x:auto}
+@media print{
+  .no-print,.period,.head-actions{display:none !important}
+  body{background:#fff}
+  .app{max-width:none;padding:0}
+  .track,.kpis div{box-shadow:none;border:1px solid #ddd;break-inside:avoid}
+}
+.head-actions .primary,.head-actions .ghost,.filters .ghost{width:auto;padding:10px 16px;display:inline-flex;align-items:center}
+.chart .tick{font-size:14px}

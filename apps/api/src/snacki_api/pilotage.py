@@ -159,16 +159,18 @@ def summary(session: Session, start: date, end: date) -> dict:
 
     def day(d: date) -> dict:
         return by_day.setdefault(
-            d, {"day": d, "app_mru": 0, "comptoir_mru": 0, "historique_mru": 0}
+            d, {"day": d, "app_mru": 0, "comptoir_mru": 0, "historique_mru": 0, "orders": 0}
         )
 
     orders = 0
     for d, source, n, amount in _live(session, start, end):
         key = "app_mru" if source == OrderSource.APP else "comptoir_mru"
         day(d)[key] += int(amount)
+        day(d)["orders"] += int(n)
         orders += int(n)
     for d, n, amount in _history(session, start, end):
         day(d)["historique_mru"] += int(amount)
+        day(d)["orders"] += int(n)
         orders += int(n)
 
     points = [by_day[d] for d in sorted(by_day)]

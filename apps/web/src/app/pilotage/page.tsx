@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AreaChart, ColumnChart } from "@/components/Charts";
 import { PAY_LABEL } from "@/lib/caisse";
 import { mru, periodFrom, presets, share, shortDay } from "@/lib/pilotage";
 import { currentStaff, staffFetch } from "@/lib/server/staff";
@@ -86,7 +87,11 @@ export default async function PilotagePage({
           <h1>Pilotage</h1>
           <p className="muted">{me.display_name ?? me.email}</p>
         </div>
-        <a className="ghost" href="/staff">Espace staff</a>
+        <nav className="head-actions" aria-label="Actions">
+          <a className="primary" href={`/pilotage/rapport?start=${period.start}&end=${period.end}`}>Générer un rapport</a>
+          <a className="ghost" href={`/historique?start=${period.start}&end=${period.end}`}>Historique</a>
+          <a className="ghost" href="/staff">Espace staff</a>
+        </nav>
       </header>
 
       <form className="period" method="get" action="/pilotage">
@@ -111,6 +116,22 @@ export default async function PilotagePage({
             <div><span>Panier moyen</span><b>{mru(data.average_basket_mru)}</b></div>
             <div><span>Aujourd&apos;hui</span><b>{mru(data.today_mru)}</b></div>
             <div><span>Cumul depuis l&apos;ouverture</span><b>{mru(data.all_time_mru)}</b></div>
+          </section>
+
+          <section className="charts">
+            <div className="track">
+              <h2>Chiffre d&apos;affaires par jour</h2>
+              {data.by_day.length === 0 ? <p className="muted">Aucune vente sur cette période.</p> : (
+                <AreaChart title="Chiffre d'affaires par jour, en MRU"
+                  points={data.by_day.map((d) => ({ label: shortDay(d.day), value: d.app_mru + d.comptoir_mru + d.historique_mru }))} />
+              )}
+            </div>
+            <div className="track">
+              <h2>Commandes par jour</h2>
+              {data.by_day.length === 0 ? <p className="muted">Aucune commande sur cette période.</p> : (
+                <ColumnChart title="Nombre de commandes par jour" points={data.by_day.map((d) => ({ label: shortDay(d.day), value: d.orders }))} />
+              )}
+            </div>
           </section>
 
           {resume && (
@@ -154,7 +175,7 @@ export default async function PilotagePage({
           )}
 
           <section className="track">
-            <h2>Par jour</h2>
+            <h2>Détail par jour et par source</h2>
             {data.by_day.length === 0 && <p className="muted">Aucune vente sur cette période.</p>}
             <ul className="bars">
               {data.by_day.map((d) => {

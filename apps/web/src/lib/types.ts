@@ -82,12 +82,20 @@ export interface Pilotage {
   average_basket_mru: number;
   today_mru: number;
   all_time_mru: number;
-  by_day: { day: string; app_mru: number; comptoir_mru: number; historique_mru: number }[];
+  by_day: { day: string; app_mru: number; comptoir_mru: number; historique_mru: number; orders: number }[];
   top: { product_id: string | null; label: string; quantity: number; revenue_mru: number }[];
   payments: { method: PaymentMethod; count: number; amount_mru: number }[];
   history_first: string | null;
   history_last: string | null;
   loyalty: { stamps: number; rewards: number; discount_mru: number; active_cards: number };
+}
+
+/** Historique des actions du staff (v1.1) : GET /v1/historique. */
+export interface History {
+  entries: { at: string; actor: string; action: string; label: string; group: string; target: string | null; detail: string }[];
+  people: { id: number; name: string }[];
+  groups: Record<string, string>;
+  truncated: boolean;
 }
 
 /** Prévisions (J10) : articles attendus aujourd'hui et les 6 jours suivants. */

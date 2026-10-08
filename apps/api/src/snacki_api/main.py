@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -20,10 +20,12 @@ from snacki_api import (
     auth,
     caisse,
     forecast,
+    historique,
     loyalty,
     orders,
     pilotage,
     quota,
+    rapport,
     repository,
     resume,
     staff,
@@ -45,6 +47,7 @@ from snacki_api.schemas import (
     CounterOrderIn,
     ForecastOut,
     Health,
+    HistoryOut,
     LoyaltyBlockIn,
     LoyaltyCodeIn,
     LoyaltyOut,
@@ -464,6 +467,47 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
         if start > end or (end - start).days >= pilotage.MAX_DAYS:
             raise HTTPException(status_code=422, detail="Période invalide (366 jours au plus)")
         return PilotageOut.model_validate(pilotage.summary(session, start, end))
+
+    def period(start: date | None, end: date | None) -> tuple[date, date]:
+        default_start, default_end = pilotage.default_period()
+        start, end = start or default_start, end or default_end
+        if start > end or (end - start).days >= pilotage.MAX_DAYS:
+            raise HTTPException(status_code=422, detail="Période invalide (366 jours au plus)")
+        return start, end
+
+    @app.get("/v1/pilotage/rapport.xlsx", tags=["pilotage"], response_class=Response)
+    def pilotage_report(
+        user: ManagerDep,
+        session: SessionDep,
+        start: Annotated[date | None, Query()] = None,
+        end: Annotated[date | None, Query()] = None,
+    ) -> Response:
+        """v1.1 : rapport Excel de la période (mêmes chiffres que l'écran), avec sa date."""
+        start, end = period(start, end)
+        data = rapport.build(pilotage.summary(session, start, end))
+        staff.audit(session, "report", user, f"{start.isoformat()}/{end.isoformat()}")
+        session.commit()
+        name = f"snacki-rapport-{start.isoformat()}-{end.isoformat()}.xlsx"
+        return Response(
+            content=data,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
+
+    @app.get("/v1/historique", response_model=HistoryOut, tags=["pilotage"])
+    def history(
+        _user: ManagerDep,
+        session: SessionDep,
+        start: Annotated[date | None, Query()] = None,
+        end: Annotated[date | None, Query()] = None,
+        person: Annotated[int | None, Query(ge=1)] = None,
+        group: Annotated[str | None, Query(pattern=r"^[a-z]{2,20}$")] = None,
+    ) -> HistoryOut:
+        """v1.1 : historique des actions du staff, filtrable (gérante et admin)."""
+        start, end = period(start, end)
+        if group and group not in historique.GROUPS:
+            raise HTTPException(status_code=422, detail="Famille d'actions inconnue")
+        return HistoryOut.model_validate(historique.entries(session, start, end, person, group))
 
     @app.get("/v1/pilotage/previsions", response_model=ForecastOut, tags=["pilotage"])
     def pilotage_forecast(_user: ManagerDep, session: SessionDep) -> ForecastOut:

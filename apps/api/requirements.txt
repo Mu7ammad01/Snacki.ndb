@@ -9,3 +9,5 @@ pydantic-settings==2.15.0
 # J6 : connexion du staff (jetons signés, appels à Google)
 pyjwt[crypto]==2.15.1
 httpx==0.28.1
+# v1.1 : rapport Excel du pilotage (écriture seulement)
+openpyxl==3.1.5

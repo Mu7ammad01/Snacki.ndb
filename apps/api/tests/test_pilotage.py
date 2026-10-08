@@ -107,6 +107,7 @@ def test_chiffres_du_jour_et_de_l_historique(api):
         "app_mru": 0,
         "comptoir_mru": 320,
         "historique_mru": 0,
+        "orders": 1,
     }
     top = {t["label"]: (t["quantity"], t["revenue_mru"]) for t in d["top"]}
     assert top["Crêpe"] == (3, 120) and top["Salade de fruits"] == (2, 200)
