@@ -15,7 +15,9 @@ comptoir, plus l'historique Excel. Aucune donnée personnelle n'est lue.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import date, timedelta
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -38,12 +40,12 @@ def load(session: Session, start: date, end: date) -> tuple[Series, set[date]]:
     """Quantités vendues par jour et par produit, et jours d'ouverture (au moins une vente)."""
     series: Series = defaultdict(lambda: defaultdict(int))
     paid = paid_orders(start, end).subquery()
-    live = session.execute(
+    live: Sequence[Any] = session.execute(  # colonnes d'une sous-requête : non typées
         select(paid.c.service_day, OrderLine.product_id, func.sum(OrderLine.quantity))
         .join(paid, OrderLine.order_id == paid.c.id)
         .group_by(paid.c.service_day, OrderLine.product_id)
     ).all()
-    old = session.execute(
+    old: Sequence[Any] = session.execute(
         select(HistorySale.service_day, HistoryItem.product_id, func.sum(HistoryItem.quantity))
         .join(HistorySale, HistoryItem.sale_id == HistorySale.id)
         .where(HistorySale.service_day.between(start, end), HistoryItem.product_id.is_not(None))

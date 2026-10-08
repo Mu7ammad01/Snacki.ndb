@@ -41,10 +41,10 @@ def purge(session: Session, retention_days: int, now: datetime | None = None) ->
             note=None,
             anonymized_at=now,
         )
-    ).rowcount
+    ).rowcount  # type: ignore[attr-defined]  # résultat d'un UPDATE : CursorResult
     audit = session.execute(
         delete(AuditLog).where(AuditLog.at < now - timedelta(days=AUDIT_DAYS))
-    ).rowcount
+    ).rowcount  # type: ignore[attr-defined]  # résultat d'un DELETE : CursorResult
     session.execute(
         update(LoyaltyCard)
         .where(

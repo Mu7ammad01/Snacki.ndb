@@ -83,6 +83,8 @@ test("sécurité : pilotage réservé, en-têtes de sécurité, session obligato
   const r = await request.get("/");
   expect(r.headers()["content-security-policy"]).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
   expect(r.headers()["x-frame-options"]).toBe("DENY");
+  expect(r.headers()["cross-origin-resource-policy"]).toBe("same-origin"); // audit J13
+  expect(r.headers()["cross-origin-embedder-policy"]).toBe("require-corp");
 
   await page.goto("/pilotage");
   await expect(page).toHaveURL(/\/connexion/);

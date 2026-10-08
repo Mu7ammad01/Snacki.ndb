@@ -1,8 +1,9 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { cookies, headers as requestHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { clientIp } from "@/lib/forwarded";
 import { apiFetch } from "@/lib/server/api";
 import { SESSION_COOKIE, type StaffMe } from "@/lib/staff";
 
@@ -18,9 +19,16 @@ export async function sessionToken(): Promise<string | null> {
 export async function staffFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await sessionToken();
   if (!token) return new Response(JSON.stringify({ detail: "Session absente" }), { status: 401 });
+  // Audit J13 (A1) : l'adresse du client accompagne la session, pour que chaque appareil ait sa
+  // propre limite de débit dans l'API (assistant, fidélité, résumé).
+  const ip = clientIp((await requestHeaders()).get("x-forwarded-for"));
   return apiFetch(path, {
     ...init,
-    headers: { ...((init.headers as Record<string, string> | undefined) ?? {}), "X-Staff-Session": token },
+    headers: {
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+      "X-Staff-Session": token,
+      ...(ip ? { "X-Forwarded-For": ip } : {}),
+    },
   });
 }
 

@@ -40,10 +40,13 @@ def list_staff(session: Session) -> list[StaffUser]:
 
 
 def _active_admins(session: Session) -> int:
-    return session.scalar(
-        select(func.count())
-        .select_from(StaffUser)
-        .where(StaffUser.role == StaffRole.ADMIN, StaffUser.active.is_(True))
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(StaffUser)
+            .where(StaffUser.role == StaffRole.ADMIN, StaffUser.active.is_(True))
+        )
+        or 0
     )
 
 

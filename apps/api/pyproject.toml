@@ -33,3 +33,13 @@ branch = true
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
+
+[tool.mypy]
+# J14 (audit A6) : vérification des types en CI. Bibliothèques sans annotations : ignorées.
+python_version = "3.12"
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["reportlab.*", "qrcode.*", "pandas.*", "defusedxml.*"]
+ignore_missing_imports = true

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { byteLength } from "@/lib/validate";
+
 import { clientIp } from "@/lib/forwarded";
 import { apiFetch } from "@/lib/server/api";
 import { isSameOrigin, publicOrigin } from "@/lib/staff";
@@ -11,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Origine refusée" }, { status: 403 });
   }
   const body = await request.text();
-  if (body.length > 256) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
+  if (byteLength(body) > 256) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const ip = clientIp(request.headers.get("x-forwarded-for"));
   if (ip) headers["X-Forwarded-For"] = ip;

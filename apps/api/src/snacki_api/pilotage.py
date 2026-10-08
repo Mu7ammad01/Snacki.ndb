@@ -11,7 +11,9 @@ Tout est calculé par PostgreSQL avec des requêtes SQLAlchemy paramétrées (au
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -85,9 +87,9 @@ def _top(session: Session, start: date, end: date) -> list[dict]:
     for pid, q, r in live:
         qty[pid] += int(q)
         revenue[pid] += int(r)
-    for pid, q in old:
-        qty[pid] += int(q)
-    rows = [
+    for old_pid, q in old:
+        qty[old_pid] += int(q)
+    rows: list[dict[str, Any]] = [
         {
             "product_id": pid,
             "label": names.get(pid, "Hors menu") if pid else "Hors menu",
@@ -101,7 +103,7 @@ def _top(session: Session, start: date, end: date) -> list[dict]:
 
 def _payments(session: Session, start: date, end: date) -> list[dict]:
     paid = paid_orders(start, end).subquery()
-    rows = session.execute(
+    rows: Sequence[Any] = session.execute(  # colonnes d'une sous-requête : non typées
         select(
             paid.c.paid_method,
             func.count(),
@@ -134,8 +136,8 @@ def _loyalty(session: Session, start: date, end: date) -> dict:
     )
     return {
         "stamps": int(stamps or 0),
-        "rewards": int(rewards),
-        "discount_mru": int(discount),
+        "rewards": int(cast(int, rewards)),
+        "discount_mru": int(cast(int, discount)),
         "active_cards": int(active or 0),
     }
 
