@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { byteLength } from "@/lib/validate";
+
 /**
  * Audit J13 : règles vérifiées sur TOUTES les routes du serveur web, présentes et futures.
  * Une nouvelle route qui oublierait une protection fait échouer la CI.
@@ -45,6 +47,14 @@ describe("routes du serveur web", () => {
   it("aucune route ne lit un secret ou une URL d'API depuis la requête", () => {
     for (const { file, code } of ALL) {
       expect(code, file).not.toMatch(/searchParams\.get\(["'](url|redirect|next|api)["']\)/);
+    }
+  });
+
+  it("la taille des requêtes se mesure en octets (audit J13, A3)", () => {
+    expect(byteLength("abc")).toBe(3);
+    expect(byteLength("عربي")).toBe(8);
+    for (const { file, code } of ALL) {
+      expect(code, file).not.toMatch(/body\.length\s*>/);
     }
   });
 });

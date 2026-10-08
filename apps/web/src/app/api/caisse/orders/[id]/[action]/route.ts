@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { byteLength } from "@/lib/validate";
+
 import { isCaisseAction } from "@/lib/caisse";
 import { relay, staffFetch } from "@/lib/server/staff";
 import { isSameOrigin, publicOrigin } from "@/lib/staff";
@@ -15,7 +17,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   if (!/^[1-9][0-9]{0,8}$/.test(id) || !isCaisseAction(action))
     return NextResponse.json({ detail: "Action inconnue" }, { status: 404 });
   const body = await request.text();
-  if (body.length > MAX_BODY) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
+  if (byteLength(body) > MAX_BODY) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
   if (body && !request.headers.get("content-type")?.startsWith("application/json"))
     return NextResponse.json({ detail: "JSON attendu" }, { status: 415 });
   try {

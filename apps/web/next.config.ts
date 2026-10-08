@@ -8,6 +8,10 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  // Scan ZAP de J13 : aucune ressource d'un autre site n'est chargée, et aucun autre site ne
+  // peut intégrer les nôtres.
+  { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ];
 
 const NO_DEVICES = "camera=(), microphone=(), geolocation=(), payment=()";

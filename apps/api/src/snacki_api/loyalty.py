@@ -157,7 +157,7 @@ def stamp(
             LoyaltyEvent.at >= now.replace(hour=0, minute=0, second=0, microsecond=0),
         )
     )
-    if today >= MAX_STAMPS_PER_DAY:
+    if (today or 0) >= MAX_STAMPS_PER_DAY:
         raise LoyaltyError("3 tampons au plus par carte et par jour")
     if phone and card.phone is None:
         card.phone = phone

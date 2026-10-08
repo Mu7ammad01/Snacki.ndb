@@ -30,3 +30,8 @@ export function validateInfo(f: InfoForm): FieldError[] {
 
 /** Supprime retours à la ligne et caractères de contrôle d'un texte libre. */
 export const oneLine = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s{2,}/g, " ").trim();
+
+/** Taille réelle d'un texte en octets (UTF-8) : un caractère arabe en pèse 2 (audit J13, A3). */
+export function byteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
+}

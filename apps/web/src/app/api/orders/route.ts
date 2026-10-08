@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { byteLength } from "@/lib/validate";
+
 import { clientIp } from "@/lib/forwarded";
 import { apiFetch } from "@/lib/server/api";
 
@@ -10,7 +12,7 @@ export async function POST(request: NextRequest) {
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     return NextResponse.json({ detail: "JSON attendu" }, { status: 415 });
   const body = await request.text();
-  if (body.length > MAX_BODY) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
+  if (byteLength(body) > MAX_BODY) return NextResponse.json({ detail: "Requête trop grande" }, { status: 413 });
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const ip = clientIp(request.headers.get("x-forwarded-for"));

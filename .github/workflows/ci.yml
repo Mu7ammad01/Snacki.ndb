@@ -106,6 +106,8 @@ jobs:
           alembic upgrade head
           alembic check
           alembic downgrade base
+      - name: Porte 2 · types Python (mypy, audit J14)
+        run: python -m mypy src
       - name: Tests de l'API (couverture minimale 80 %)
         run: python -m pytest --cov --cov-report=term-missing
 

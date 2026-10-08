@@ -2,7 +2,7 @@
 
 Version 10 · J8 bis (5 octobre 2026) · méthode STRIDE · revu à chaque PR qui ajoute une entrée, une donnée ou un service.
 
-Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 28 menaces ci-dessous en découlent : 27 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7, 2 à J8, 1 à J8 bis, 2 à J9 et 2 à J10), la dernière (T24) a son jour de traitement dans le plan.
+Snacki traite peu de données sensibles (pas de carte bancaire, pas de mot de passe), mais trois choses ont de la valeur pour un attaquant ou un fraudeur : **les prix et les totaux** (argent du snack), **les coordonnées des clients** (prénom, téléphone, repère de livraison) et **les accès du staff** (caisse, annulations, pilotage). Les 28 menaces ci-dessous en découlent : les 28 sont traitées (4 à J1, dont 2 par des scripts appliqués le 28/09/2026 sur GitHub et Google Cloud, 1 à J2, 4 à J3, 1 à J4, 3 à J5, 5 à J6, 2 à J7, 2 à J8, 1 à J8 bis, 2 à J9, 2 à J10 et 1 à J14).
 
 ## 1. Périmètre et hypothèses
 
@@ -123,7 +123,7 @@ Risque = vraisemblance (1 à 3) × impact (1 à 3) : 1–2 faible, 3–4 moyen, 
 | T21 | Flux 13 | S | Clé de compte de service Google volée dans la CI | 1 × 3 | moyen | Aucune clé : Workload Identity Federation limitée à l'identifiant du dépôt, à `main` et au workflow `deploy.yml` ; accès de quelques minutes au seul compte `snacki-deployer` | V13 (N2) | J5 | **fait** (ADR 0007) |
 | T22 | Secret Manager | E | L'API de staging lit les secrets de production | 1 × 3 | moyen | Un compte de service par service et par environnement ; chaque secret lisible par la seule API de son environnement ; le déployeur ne lit aucun secret ; une branche Neon par environnement | V13 (N2) | J5 | **fait** (ADR 0007) |
 | T23 | Cloud | D | Abus qui fait exploser la facture | 2 × 2 | moyen | Alerte de budget à 1 €, `max-instances=2`, quotas IA | V6.1.1 | J1 | **fait** (appliqué le 28/09/2026 : budget de 1 EUR actif) |
-| T24 | Base | I | Vol ou perte des données (compte Neon compromis, suppression) | 1 × 3 | moyen | 2FA sur Neon et Google, historique de 6 h, export hebdomadaire chiffré | V11.3.2 | J14 | prévu |
+| T24 | Base | I | Vol ou perte des données (compte Neon compromis, suppression) | 1 × 3 | moyen | Sauvegarde nocturne non effaçable 30 jours, test de restauration mensuel, restauration réelle outillée (`restore-to.sh`), procédure d'incident, 2FA sur les comptes | V11.3.2 | J14 | traité |
 | T25 | Flux 1 | S | Fausse commande de livraison passée avec le numéro d'un tiers, maintenant que WhatsApp ne confirme plus l'identité du client | 2 × 2 | moyen | Commande « reçue » à accepter par le staff, avec délai et frais ; numéro cliquable dans la caisse ; livraison impossible à marquer « remise » sans appel au client (409) ; refus motivé par la gérante ; limite de débit (T04) | V2.3.1 | J7 | **fait** (ADR 0009) |
 | T26 | Flux 9 | I | Un caissier, ou quiconque sans session, lit le chiffre d'affaires et les ventes du snack | 2 × 2 | moyen | `GET /v1/pilotage` réservé à la gérante et à l'admin (`require_role`, refus journalisé) ; page `/pilotage` fermée sans session (contrôle au déploiement) ; réponses `no-store` | V8.2.1 | J8 | **fait** (ADR 0010) |
 | T27 | Import | T | Classeur Excel piégé (bombe XML, entité externe, formule) qui fait planter ou détourne l'import | 1 × 2 | faible | Script d'administration, jamais un téléversement web ; .xlsx de 5 Mo au plus ; defusedxml ; valeurs lues sans formule ; feuille « Ventes » seule ; textes nettoyés et bornés ; essai à blanc avant d'écrire | V1.5.1 | J8 | **fait** (ADR 0010) |
@@ -188,3 +188,5 @@ Chaque cas deviendra un test automatique ou un point du pentest de J13.
 | 05/10/2026 | 10 | J8 bis : T28 (fraude à la fidélité) traitée ; carte et téléphone facultatif ajoutés à l'inventaire des données |
 | 06/10/2026 | 11 | J10 : T15 (quota Gemini) et T16 (chiffre inventé par l'IA) traitées ; seuls des agrégats sans donnée personnelle partent vers Gemini pour le résumé |
 | 07/10/2026 | 12 | J12 : T20 complétée (SBOM CycloneDX, images signées sans clé et vérifiées avant chaque déploiement) ; porte 9 active (OWASP ZAP baseline sur staging) |
+| 08/10/2026 | 13 | J13 : audit (ASVS niveau 1) et scan ZAP complet de staging : aucune faille haute ; 5 constats faibles |
+| 08/10/2026 | 14 | J14 : constats de l'audit corrigés ; T24 traitée (restauration réelle outillée, procédure d'incident) : 28 menaces sur 28 traitées |
