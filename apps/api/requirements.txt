@@ -1,10 +1,10 @@
 # Dépendances d'exécution de l'API, versions figées (Dependabot propose les mises à jour).
-fastapi==0.141.1
+fastapi==0.143.0
 uvicorn[standard]==0.54.0
-sqlalchemy==2.1.1
+sqlalchemy==2.1.4
 alembic==1.20.0
 psycopg[binary]==3.3.6
-pydantic==2.13.5
+pydantic==2.14.0
 pydantic-settings==2.15.0
 # J6 : connexion du staff (jetons signés, appels à Google)
 pyjwt[crypto]==2.15.1

@@ -3,10 +3,10 @@
 pytest==9.1.1
 pytest-cov==7.1.0
 # J8 : import de l'historique Excel (script d'administration, hors de l'image de l'API)
-pandas==2.3.3
+pandas==3.0.6
 defusedxml==0.7.1
 # J8 bis : étiquettes QR des cartes de fidélité (script d'administration)
 qrcode==8.2
-reportlab==4.4.4
+reportlab==5.0.1
 # J14 (audit A6) : vérification des types en CI
-mypy==1.20.2
+mypy==2.4.0
