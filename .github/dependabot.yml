@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     groups:
       actions:
         patterns: ["*"]
@@ -15,8 +14,7 @@ updates:
   - package-ecosystem: pip
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     groups:
       outils-dev:
         patterns: ["*"]
@@ -26,8 +24,7 @@ updates:
   - package-ecosystem: pip
     directory: /apps/api
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     groups:
       api:
         patterns: ["*"]
@@ -37,8 +34,7 @@ updates:
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     groups:
       web:
         patterns: ["*"]
@@ -57,8 +53,7 @@ updates:
   - package-ecosystem: docker
     directory: /apps/api
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
@@ -68,8 +63,7 @@ updates:
   - package-ecosystem: docker
     directory: /apps/web
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
