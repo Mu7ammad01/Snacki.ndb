@@ -153,3 +153,60 @@ test("v1.1 · gérante : graphiques, rapport Excel et PDF, historique filtrable"
 
   expect((await request.get("/api/pilotage/rapport?start=x&end=y")).status()).toBe(422);
 });
+
+test("J16 · achats : fournisseur, ingrédient, achat, stock, inventaire, annulation, marge", async ({ page, context }) => {
+  await connecter(context, "gerante");
+  const fourn = unique("Marché");
+  const ingr = unique("Avocat");
+
+  await page.goto("/achats?vue=fournisseurs");
+  await page.getByLabel("Nom", { exact: true }).fill(fourn);
+  await page.getByLabel("Téléphone (facultatif)").fill("36 12 34 56");
+  await page.getByRole("button", { name: "Ajouter" }).click();
+  await expect(page.getByText(`${fourn} ajouté.`)).toBeVisible();
+
+  await page.goto("/achats?vue=stock");
+  await page.getByLabel("Nouvel ingrédient").fill(ingr);
+  await page.getByLabel("Alerte sous (facultatif)").fill("3");
+  await page.getByRole("button", { name: "Ajouter" }).click();
+  await expect(page.getByText(`${ingr} ajouté au stock.`)).toBeVisible();
+
+  await page.goto("/achats");
+  await page.getByRole("combobox", { name: "Fournisseur" }).first().selectOption({ label: fourn });
+  await page.getByLabel("Article de la ligne 1").selectOption({ label: `${ingr} (kg)` });
+  await page.getByLabel(/^Quantité/).fill("2,5");
+  await page.getByLabel("Montant (MRU)").fill("750");
+  await page.getByRole("button", { name: "+ Ajouter une ligne" }).click();
+  await page.getByLabel("Libellé").fill("Gaz");
+  await page.getByRole("combobox", { name: "Catégorie" }).selectOption("energie");
+  await page.getByLabel("Montant (MRU)").nth(1).fill("400");
+  await page.getByRole("button", { name: /Enregistrer l'achat · 1 150 MRU/ }).click();
+  await expect(page.getByText(/Achat n° \d+ enregistré : 1 150 MRU/)).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: fourn });
+  await expect(row).toContainText("1 150 MRU");
+
+  // Stock monté à 2,5 kg, sous le seuil de 3 kg : alerte.
+  await page.goto("/achats?vue=stock");
+  const line = page.getByRole("row").filter({ hasText: ingr });
+  await expect(line).toContainText("2,5 kg");
+  await expect(line).toContainText("stock bas");
+
+  // Inventaire : 2 kg comptés.
+  await line.getByRole("button", { name: "Inventaire" }).click();
+  await page.getByLabel(`Quantité comptée de ${ingr}`).fill("2");
+  await page.getByRole("button", { name: "Valider" }).click();
+  await expect(page.getByText(`Stock de ${ingr} corrigé.`)).toBeVisible();
+  await expect(line).toContainText("2 kg");
+
+  // Annuler l'achat retirerait 2,5 kg d'un stock de 2 kg : refusé, avec le motif.
+  await page.goto("/achats");
+  await row.getByRole("button", { name: "Annuler…" }).click();
+  await row.getByPlaceholder("Motif (3 caractères au moins)").fill("ticket en double");
+  await row.getByRole("button", { name: "Confirmer" }).click();
+  await expect(row.getByText(/deviendrait négatif/)).toBeVisible();
+
+  // Pilotage : achats et marge brute affichés.
+  await page.goto("/pilotage?start=2026-01-01");
+  await expect(page.getByRole("heading", { name: "Achats et marge" })).toBeVisible();
+  await expect(page.getByText(/marge brute/i).first()).toBeVisible();
+});

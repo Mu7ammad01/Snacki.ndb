@@ -1,4 +1,5 @@
-"""Pilotage (J8) : chiffre d'affaires, produits les plus vendus, moyens de paiement.
+"""Pilotage (J8) : chiffre d'affaires, produits les plus vendus, moyens de paiement ;
+dépenses et marge brute (J16).
 
 Deux sources, additionnées jour par jour :
 - les ventes de l'app et du comptoir : commandes encaissées, ni refusées ni annulées ;
@@ -18,6 +19,7 @@ from typing import Any, cast
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
+from snacki_api import achats
 from snacki_api.models import (
     HistoryItem,
     HistorySale,
@@ -29,6 +31,7 @@ from snacki_api.models import (
     OrderSource,
     OrderStatus,
     Product,
+    Purchase,
 )
 
 MAX_DAYS = 366
@@ -181,6 +184,7 @@ def summary(session: Session, start: date, end: date) -> dict:
     )
     span = select(func.min(HistorySale.service_day), func.max(HistorySale.service_day))
     first, last = session.execute(span).one()
+    spent = achats.spending(session, start, end)
     return {
         "start": start,
         "end": end,
@@ -195,6 +199,12 @@ def summary(session: Session, start: date, end: date) -> dict:
         "history_first": first,
         "history_last": last,
         "loyalty": _loyalty(session, start, end),
+        # J16 : dépenses et marge brute (ventes − achats saisis, sur la même période).
+        "purchases": spent,
+        "gross_margin_mru": revenue - spent["total_mru"],
+        "purchases_first": session.scalar(
+            select(func.min(Purchase.purchase_day)).where(Purchase.cancelled_at.is_(None))
+        ),
     }
 
 

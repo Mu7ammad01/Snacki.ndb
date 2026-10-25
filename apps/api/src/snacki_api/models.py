@@ -1,7 +1,9 @@
-"""Tables de la base : catalogue (J2), commandes (J3), staff (J6), historique et fidélité (J8)."""
+"""Tables de la base : catalogue (J2), commandes (J3), staff (J6), historique et fidélité (J8),
+achats et stock (J16)."""
 
 import enum
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
@@ -10,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Numeric,
     String,
     UniqueConstraint,
     func,
@@ -319,6 +322,139 @@ class LoyaltyEvent(Base):
     kind: Mapped[LoyaltyKind] = mapped_column(_enum(LoyaltyKind, "loyalty_kind"))
     delta: Mapped[int]
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Supplier(Base):
+    """Fournisseur du snack (J16). Désactivé plutôt qu'effacé : ses achats restent lisibles."""
+
+    __tablename__ = "supplier"
+    __table_args__ = (
+        CheckConstraint("char_length(name) BETWEEN 2 AND 80", name="supplier_name_length"),
+        CheckConstraint("phone IS NULL OR phone ~ '^[234][0-9]{7}$'", name="supplier_phone_mr"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    phone: Mapped[str | None] = mapped_column(String(8))
+    note: Mapped[str | None] = mapped_column(String(160))
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StockUnit(enum.StrEnum):
+    KG = "kg"
+    LITRE = "l"
+    PIECE = "piece"
+
+
+class Ingredient(Base):
+    """Ingrédient suivi en stock (J16). Le stock monte à chaque achat ; l'inventaire le corrige."""
+
+    __tablename__ = "ingredient"
+    __table_args__ = (
+        CheckConstraint("char_length(name) BETWEEN 2 AND 60", name="ingredient_name_length"),
+        CheckConstraint("stock_qty >= 0 AND stock_qty <= 1000000", name="ingredient_stock_range"),
+        CheckConstraint(
+            "alert_qty IS NULL OR (alert_qty >= 0 AND alert_qty <= 1000000)",
+            name="ingredient_alert_range",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), unique=True)
+    unit: Mapped[StockUnit] = mapped_column(_enum(StockUnit, "stock_unit"))
+    stock_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=Decimal(0))
+    alert_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
+    active: Mapped[bool] = mapped_column(default=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class PurchaseCategory(enum.StrEnum):
+    INGREDIENTS = "ingredients"
+    EMBALLAGES = "emballages"
+    ENERGIE = "energie"  # gaz, électricité, eau
+    ENTRETIEN = "entretien"
+    MATERIEL = "materiel"
+    AUTRE = "autre"
+
+
+class Purchase(Base):
+    """Achat (ticket ou facture) saisi par la gérante ou l'admin (J16).
+
+    Jamais modifié ni effacé : une erreur se corrige en annulant l'achat (motif obligatoire,
+    stock repris) puis en le saisissant à nouveau. Le total est calculé par l'API.
+    """
+
+    __tablename__ = "purchase"
+    __table_args__ = (
+        CheckConstraint("total_mru BETWEEN 1 AND 10000000", name="purchase_total_range"),
+        CheckConstraint(
+            "(cancelled_at IS NULL) = (cancel_reason IS NULL)", name="purchase_cancel_reason"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_day: Mapped[date] = mapped_column(Date, index=True)
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("supplier.id"), index=True)
+    payment_method: Mapped[PaymentMethod] = mapped_column(_enum(PaymentMethod, "payment_method"))
+    total_mru: Mapped[int]
+    note: Mapped[str | None] = mapped_column(String(160))
+    created_by: Mapped[int] = mapped_column(ForeignKey("staff_user.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_by: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
+    cancel_reason: Mapped[str | None] = mapped_column(String(160))
+
+    supplier: Mapped[Supplier | None] = relationship()
+    lines: Mapped[list["PurchaseLine"]] = relationship(
+        back_populates="purchase", cascade="all, delete-orphan", order_by="PurchaseLine.id"
+    )
+
+
+class PurchaseLine(Base):
+    __tablename__ = "purchase_line"
+    __table_args__ = (
+        CheckConstraint("quantity > 0 AND quantity <= 100000", name="purchase_qty_range"),
+        CheckConstraint("amount_mru BETWEEN 1 AND 1000000", name="purchase_amount_range"),
+        CheckConstraint(
+            "ingredient_id IS NULL OR category = 'ingredients'", name="purchase_line_category"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_id: Mapped[int] = mapped_column(ForeignKey("purchase.id", ondelete="CASCADE"))
+    ingredient_id: Mapped[int | None] = mapped_column(ForeignKey("ingredient.id"), index=True)
+    # Libellé copié au moment de l'achat : l'historique ne change pas si l'ingrédient est renommé.
+    label: Mapped[str] = mapped_column(String(60))
+    category: Mapped[PurchaseCategory] = mapped_column(_enum(PurchaseCategory, "purchase_category"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    amount_mru: Mapped[int]  # montant de la ligne, tel qu'écrit sur le ticket
+
+    purchase: Mapped[Purchase] = relationship(back_populates="lines")
+
+
+class StockMoveKind(enum.StrEnum):
+    PURCHASE = "purchase"
+    CANCEL = "cancel"  # achat annulé : la quantité est reprise
+    INVENTORY = "inventory"  # comptage réel : le stock est remplacé par la quantité comptée
+
+
+class StockMove(Base):
+    """Grand livre du stock (J16) : chaque variation, sa cause et son auteur."""
+
+    __tablename__ = "stock_move"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ingredient_id: Mapped[int] = mapped_column(ForeignKey("ingredient.id"), index=True)
+    kind: Mapped[StockMoveKind] = mapped_column(_enum(StockMoveKind, "stock_move_kind"))
+    delta: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    stock_after: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    purchase_id: Mapped[int | None] = mapped_column(ForeignKey("purchase.id"))
+    reason: Mapped[str | None] = mapped_column(String(160))
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("staff_user.id"))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

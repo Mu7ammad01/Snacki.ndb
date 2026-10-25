@@ -1,4 +1,4 @@
-"""Rapport du pilotage en Excel (v1.1, réunion 5, demande 2).
+"""Rapport du pilotage en Excel (v1.1, réunion 5, demande 2 ; achats et marge : J16).
 
 Mêmes chiffres que l'écran de pilotage (pilotage.summary), pour la période choisie, avec la
 date de génération. Le PDF, lui, est la page rapport du site enregistrée par le navigateur.
@@ -57,6 +57,9 @@ def build(summary: dict, now: datetime | None = None) -> bytes:
         ("Tampons de fidélité", summary["loyalty"]["stamps"]),
         ("Commandes offertes", summary["loyalty"]["rewards"]),
         ("Montant offert (MRU)", summary["loyalty"]["discount_mru"]),
+        ("", ""),
+        ("Achats (MRU)", summary["purchases"]["total_mru"]),
+        ("Marge brute (MRU) = ventes − achats", summary["gross_margin_mru"]),
     ]
     for label, value in lines:
         ws.append([label, value])
@@ -94,8 +97,21 @@ def build(summary: dict, now: datetime | None = None) -> bytes:
             for p in summary["payments"]
         ],
     )
-    for row in wb["Par jour"].iter_rows(min_row=2, max_col=1):
-        row[0].number_format = "DD/MM/YYYY"
+    spent = summary["purchases"]
+    _sheet(
+        wb,
+        "Achats",
+        ["Catégorie", "Montant (MRU)"],
+        [[c["label"], c["amount_mru"]] for c in spent["by_category"]]
+        + [["", ""], ["Fournisseur", "Montant (MRU)"]]
+        + [[f["supplier"], f["amount_mru"]] for f in spent["by_supplier"]]
+        + [["", ""], ["Jour", "Montant (MRU)"]]
+        + [[d["day"], d["amount_mru"]] for d in spent["by_day"]],
+    )
+    for sheet in ("Par jour", "Achats"):
+        for row in wb[sheet].iter_rows(min_row=2, max_col=1):
+            if isinstance(row[0].value, date):
+                row[0].number_format = "DD/MM/YYYY"
     out = BytesIO()
     wb.save(out)
     return out.getvalue()

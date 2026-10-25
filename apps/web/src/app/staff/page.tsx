@@ -47,6 +47,12 @@ export default async function StaffHome() {
           </a>
         )}
         {show.pilotage && (
+          <a className="track staff-link" href="/achats">
+            <h2>Achats et stock →</h2>
+            <p className="muted">Saisir un achat, suivre le stock des ingrédients et les fournisseurs.</p>
+          </a>
+        )}
+        {show.pilotage && (
           <a className="track staff-link" href="/historique">
             <h2>Historique →</h2>
             <p className="muted">Qui a fait quoi et quand : commandes, encaissements, refus, fidélité, équipe.</p>

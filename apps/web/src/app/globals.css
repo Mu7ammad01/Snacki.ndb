@@ -322,3 +322,19 @@ a.staff-link:hover{outline:2px solid var(--sun)}
 }
 .head-actions .primary,.head-actions .ghost,.filters .ghost{width:auto;padding:10px 16px;display:inline-flex;align-items:center}
 .chart .tick{font-size:14px}
+/* J16 · achats et stock */
+.purchase-lines{list-style:none;padding:0;margin:8px 0;display:grid;gap:10px}
+.purchase-lines li{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;border:1.5px solid var(--line);border-radius:14px;padding:10px}
+.purchase-lines label,.inline-form label{display:grid;gap:4px;font-size:13px;font-weight:700}
+.purchase-lines input,.purchase-lines select,.inline-form input{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:8px;font:inherit;color:var(--ink);min-width:0}
+.purchase-lines input{width:110px}
+.purchase-lines .ghost,.add-line,.ghost.small{width:auto;padding:8px 12px}
+.ghost.small{font-size:13px;border-radius:12px}
+.filters .grow{flex:1 1 260px}
+.filters .grow input{width:100%}
+.inline-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.inline-form input{width:140px}
+.row-actions{display:inline-flex;flex-wrap:wrap;gap:6px}
+.table tr.off td{opacity:.55}
+.tag.bad{color:#8A1621;font-weight:700;font-size:12px}
+.table td.num{white-space:nowrap}
