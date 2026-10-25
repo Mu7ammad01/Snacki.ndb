@@ -102,7 +102,7 @@ def test_rapport_excel(api):
     assert r.headers["content-type"].startswith("application/vnd.openxmlformats")
     assert "attachment" in r.headers["content-disposition"]
     wb = load_workbook(BytesIO(r.content))
-    assert wb.sheetnames == ["Synthèse", "Par jour", "Produits", "Paiements"]
+    assert wb.sheetnames == ["Synthèse", "Par jour", "Produits", "Paiements", "Achats"]
     synthese = {row[0]: row[1] for row in wb["Synthèse"].iter_rows(values_only=True)}
     assert synthese["Chiffre d'affaires (MRU)"] == 400 and synthese["Commandes"] == 2
     assert str(synthese["Généré le"]).startswith(datetime.now(UTC).strftime("%d/%m/%Y"))

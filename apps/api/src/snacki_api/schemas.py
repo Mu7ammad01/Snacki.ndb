@@ -4,7 +4,8 @@ On ne renvoie jamais un objet de la base tel quel : chaque réponse liste ses ch
 """
 
 import re
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -23,7 +24,9 @@ from snacki_api.models import (
     OrderSource,
     OrderStatus,
     PaymentMethod,
+    PurchaseCategory,
     StaffRole,
+    StockUnit,
 )
 
 
@@ -326,6 +329,9 @@ class PilotageOut(BaseModel):
     history_first: date | None
     history_last: date | None
     loyalty: LoyaltyStats
+    purchases: "SpendingOut"  # J16 : dépenses de la période
+    gross_margin_mru: int  # J16 : chiffre d'affaires − achats de la période
+    purchases_first: date | None  # J16 : premier achat saisi (marge fiable à partir de là)
 
 
 # --- Prévisions et résumé du jour (J10) ------------------------------------------------------
@@ -484,3 +490,228 @@ class AssistantOut(BaseModel):
     fulfilment: Literal["emporter", "livraison", "inconnu"]
     unknown: list[str]
     warnings: list[str]
+
+
+# --- Achats et stock (J16) ------------------------------------------------------------------
+
+ShortText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=2, max_length=60, pattern=_NO_CONTROL)
+]
+SupplierName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80, pattern=_NO_CONTROL)
+]
+Memo = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160, pattern=_NO_CONTROL)
+]
+Quantity = Annotated[Decimal, Field(gt=0, le=100000, max_digits=9, decimal_places=3)]
+StockQty = Annotated[Decimal, Field(ge=0, le=1000000, max_digits=10, decimal_places=3)]
+
+
+def _mr_phone(value: str | None) -> str | None:
+    if value is None or value.strip() == "":
+        return None
+    digits = re.sub(r"[\s.-]", "", value)
+    for prefix in ("+222", "00222"):
+        if digits.startswith(prefix):
+            digits = digits[len(prefix) :]
+    if not re.fullmatch(r"[234][0-9]{7}", digits):
+        raise ValueError("numéro mauritanien attendu : 8 chiffres commençant par 2, 3 ou 4")
+    return digits
+
+
+class SupplierIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: SupplierName
+    phone: str | None = None
+    note: Memo | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str | None) -> str | None:
+        return _mr_phone(value)
+
+
+class SupplierUpdateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: SupplierName | None = None
+    phone: str | None = None
+    note: Memo | None = None
+    active: bool | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str | None) -> str | None:
+        return _mr_phone(value)
+
+
+class SupplierOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    phone: str | None
+    note: str | None
+    active: bool
+
+
+class IngredientIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: ShortText
+    unit: StockUnit
+    alert_qty: StockQty | None = None
+
+
+class IngredientUpdateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: ShortText | None = None
+    alert_qty: StockQty | None = None
+    active: bool | None = None
+
+
+class IngredientOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    unit: StockUnit
+    stock_qty: float
+    alert_qty: float | None
+    active: bool
+    low: bool = False
+
+
+class InventoryIn(BaseModel):
+    """Comptage réel d'un ingrédient : le stock devient cette quantité (motif obligatoire)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    quantity: StockQty
+    reason: Reason
+
+
+class StockMoveOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: Literal["purchase", "cancel", "inventory"]
+    delta: float
+    stock_after: float
+    purchase_id: int | None
+    reason: str | None
+    at: datetime
+
+
+class PurchaseLineIn(BaseModel):
+    """Une ligne du ticket : un ingrédient suivi (stock) OU un libellé libre et sa catégorie."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ingredient_id: int | None = Field(default=None, ge=1)
+    label: ShortText | None = None
+    category: PurchaseCategory = PurchaseCategory.INGREDIENTS
+    quantity: Quantity
+    amount_mru: int = Field(ge=1, le=1_000_000)
+
+    @model_validator(mode="after")
+    def _one_kind(self) -> "PurchaseLineIn":
+        if (self.ingredient_id is None) == (self.label is None):
+            raise ValueError("indiquer soit un ingrédient, soit un libellé")
+        if self.ingredient_id is not None and self.category != PurchaseCategory.INGREDIENTS:
+            raise ValueError("une ligne d'ingrédient est de catégorie « ingrédients »")
+        return self
+
+
+class PurchaseIn(BaseModel):
+    """Ce qu'envoie la gérante : lignes et montants du ticket ; le total est calculé par l'API."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    purchase_day: date
+    supplier_id: int | None = Field(default=None, ge=1)
+    payment_method: PaymentMethod
+    note: Memo | None = None
+    lines: list[PurchaseLineIn] = Field(min_length=1, max_length=30)
+
+    @field_validator("purchase_day")
+    @classmethod
+    def _day(cls, value: date) -> date:
+        today = datetime.now(UTC).date()  # Nouadhibou vit à UTC+0
+        if value > today or value < today - timedelta(days=366):
+            raise ValueError("date d'achat entre il y a un an et aujourd'hui")
+        return value
+
+    @model_validator(mode="after")
+    def _unique(self) -> "PurchaseIn":
+        ids = [line.ingredient_id for line in self.lines if line.ingredient_id is not None]
+        if len(ids) != len(set(ids)):
+            raise ValueError("un ingrédient ne doit apparaître qu'une fois (regrouper les lignes)")
+        return self
+
+
+class PurchaseLineOut(BaseModel):
+    ingredient_id: int | None
+    label: str
+    category: PurchaseCategory
+    quantity: float
+    amount_mru: int
+
+
+class PurchaseOut(BaseModel):
+    id: int
+    purchase_day: date
+    supplier_id: int | None
+    supplier: str | None
+    payment_method: PaymentMethod
+    total_mru: int
+    note: str | None
+    created_by: str
+    created_at: datetime
+    cancelled_at: datetime | None
+    cancel_reason: str | None
+    lines: list[PurchaseLineOut]
+
+
+class PurchaseListOut(BaseModel):
+    start: date
+    end: date
+    purchases: list[PurchaseOut]
+    total_mru: int  # achats non annulés de la période
+    truncated: bool
+
+
+class SpendingDay(BaseModel):
+    day: date
+    amount_mru: int
+
+
+class SpendingCategory(BaseModel):
+    category: PurchaseCategory
+    label: str
+    amount_mru: int
+
+
+class SpendingSupplier(BaseModel):
+    supplier: str
+    count: int
+    amount_mru: int
+
+
+class LowStock(BaseModel):
+    id: int
+    name: str
+    unit: StockUnit
+    stock_qty: float
+
+
+class SpendingOut(BaseModel):
+    total_mru: int
+    by_day: list[SpendingDay]
+    by_category: list[SpendingCategory]
+    by_supplier: list[SpendingSupplier]
+    low_stock: list[LowStock]
+
+
+PilotageOut.model_rebuild()

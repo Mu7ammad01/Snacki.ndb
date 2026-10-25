@@ -67,6 +67,8 @@ export default async function RapportPage({ searchParams }: { searchParams: Prom
             <div><span>Commandes</span><b>{data.orders}</b></div>
             <div><span>Panier moyen</span><b>{mru(data.average_basket_mru)}</b></div>
             <div><span>Cumul depuis l&apos;ouverture</span><b>{mru(data.all_time_mru)}</b></div>
+            <div><span>Achats</span><b>{mru(data.purchases.total_mru)}</b></div>
+            <div><span>Marge brute</span><b>{mru(data.gross_margin_mru)}</b></div>
           </section>
           <section className="charts">
             <div className="track">

@@ -39,6 +39,13 @@ LABELS: dict[str, tuple[str, str]] = {
     "staff_added": ("Membre ajouté", "equipe"),
     "staff_updated": ("Membre modifié", "equipe"),
     "report": ("Rapport téléchargé", "equipe"),
+    "purchase_added": ("Achat enregistré", "achats"),
+    "purchase_cancelled": ("Achat annulé", "achats"),
+    "supplier_added": ("Fournisseur ajouté", "achats"),
+    "supplier_updated": ("Fournisseur modifié", "achats"),
+    "ingredient_added": ("Ingrédient ajouté", "achats"),
+    "ingredient_updated": ("Ingrédient modifié", "achats"),
+    "stock_inventory": ("Inventaire", "achats"),
 }
 GROUPS = {
     "commandes": "Commandes",
@@ -48,6 +55,7 @@ GROUPS = {
     "equipe": "Équipe",
     "connexions": "Connexions",
     "ia": "Intelligence artificielle",
+    "achats": "Achats et stock",
 }
 
 
@@ -56,7 +64,8 @@ VALUES = {
     "prete": "prête", "livree": "remise", "refusee": "refusée", "annulee": "annulée",
     "cash": "espèces", "bankily": "Bankily", "sedad": "Sedad", "bimbank": "Bimbank",
     "bamis": "Bamis", "delai_min": "délai (min)", "frais": "frais (MRU)",
-    "montant": "montant (MRU)",
+    "montant": "montant (MRU)", "lignes": "lignes", "motif": "motif",
+    "compte": "quantité comptée", "ecart": "écart", "champs": "champs",
 }  # fmt: skip
 
 

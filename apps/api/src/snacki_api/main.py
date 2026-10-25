@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from snacki_api import (
+    achats,
     assistant,
     auth,
     caisse,
@@ -32,7 +33,7 @@ from snacki_api import (
 )
 from snacki_api.config import Settings, get_settings
 from snacki_api.db import get_session
-from snacki_api.models import Category, StaffRole, StaffUser
+from snacki_api.models import Category, Ingredient, StaffRole, StaffUser, Supplier
 from snacki_api.ratelimit import DEFAULT_RULES, RateLimiter
 from snacki_api.schemas import (
     AcceptIn,
@@ -48,6 +49,10 @@ from snacki_api.schemas import (
     ForecastOut,
     Health,
     HistoryOut,
+    IngredientIn,
+    IngredientOut,
+    IngredientUpdateIn,
+    InventoryIn,
     LoyaltyBlockIn,
     LoyaltyCodeIn,
     LoyaltyOut,
@@ -61,12 +66,19 @@ from snacki_api.schemas import (
     PayIn,
     PilotageOut,
     ProductOut,
+    PurchaseIn,
+    PurchaseListOut,
+    PurchaseOut,
     ReasonIn,
     ResumeOut,
     StaffCreateIn,
     StaffMeOut,
     StaffOut,
     StaffUpdateIn,
+    StockMoveOut,
+    SupplierIn,
+    SupplierOut,
+    SupplierUpdateIn,
 )
 
 log = logging.getLogger("snacki.api")
@@ -76,7 +88,10 @@ SessionDep = Annotated[Session, Depends(get_session)]
 ProductId = Annotated[str, Path(pattern=r"^[a-z][a-z-]{0,39}$")]
 
 # Réponses avec jeton, données de commande ou chiffres de vente : jamais en cache.
-NO_STORE = ("/v1/orders", "/v1/auth", "/v1/staff", "/v1/caisse", "/v1/pilotage", "/v1/loyalty")
+NO_STORE = (
+    "/v1/orders", "/v1/auth", "/v1/staff", "/v1/caisse", "/v1/pilotage", "/v1/loyalty",
+    "/v1/achats", "/v1/historique",
+)  # fmt: skip
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -628,6 +643,140 @@ def create_app(settings: Settings | None = None, oidc: auth.GoogleOIDC | None = 
     ) -> list[LoyaltyOut]:
         """Retrouver la carte d'un client par son téléphone (gérante, admin)."""
         return [LoyaltyOut(**loyalty.summary(c)) for c in loyalty.search_phone(session, data.phone)]
+
+    # --- Achats et stock (J16) --------------------------------------------------------------
+    # Gérante et admin, mêmes droits ; chaque action est journalisée (T11).
+
+    ItemId = Annotated[int, Path(ge=1, le=999_999_999)]
+
+    def achat_act(session: Session, action):
+        """Applique une action d'achat : 409 (refus métier) ou 404, sinon validation."""
+        try:
+            result = action()
+        except achats.AchatError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        except LookupError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from None
+        session.commit()
+        return result
+
+    def ingredient_out(i: Ingredient) -> IngredientOut:
+        out = IngredientOut.model_validate(i)
+        out.low = i.alert_qty is not None and i.stock_qty <= i.alert_qty
+        return out
+
+    @app.get("/v1/achats/fournisseurs", response_model=list[SupplierOut], tags=["achats"])
+    def supplier_list(_user: ManagerDep, session: SessionDep) -> list[SupplierOut]:
+        return [SupplierOut.model_validate(x) for x in achats.suppliers(session)]
+
+    @app.post(
+        "/v1/achats/fournisseurs", response_model=SupplierOut, status_code=201, tags=["achats"]
+    )
+    def supplier_add(data: SupplierIn, user: ManagerDep, session: SessionDep) -> SupplierOut:
+        found = achat_act(
+            session, lambda: achats.add_supplier(session, user, data.name, data.phone, data.note)
+        )
+        return SupplierOut.model_validate(found)
+
+    @app.patch("/v1/achats/fournisseurs/{item_id}", response_model=SupplierOut, tags=["achats"])
+    def supplier_update(
+        item_id: ItemId, data: SupplierUpdateIn, user: ManagerDep, session: SessionDep
+    ) -> SupplierOut:
+        found = session.get(Supplier, item_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="Fournisseur introuvable")
+        changes = data.model_dump(exclude_unset=True)
+        if "name" in changes and changes["name"] is None:
+            raise HTTPException(status_code=422, detail="Nom obligatoire")
+        if "active" in changes and changes["active"] is None:
+            del changes["active"]
+        achat_act(session, lambda: achats.update_supplier(session, user, found, changes))
+        return SupplierOut.model_validate(found)
+
+    @app.get("/v1/achats/ingredients", response_model=list[IngredientOut], tags=["achats"])
+    def ingredient_list(_user: ManagerDep, session: SessionDep) -> list[IngredientOut]:
+        return [ingredient_out(i) for i in achats.ingredients(session)]
+
+    @app.post(
+        "/v1/achats/ingredients", response_model=IngredientOut, status_code=201, tags=["achats"]
+    )
+    def ingredient_add(data: IngredientIn, user: ManagerDep, session: SessionDep) -> IngredientOut:
+        found = achat_act(
+            session,
+            lambda: achats.add_ingredient(session, user, data.name, data.unit, data.alert_qty),
+        )
+        return ingredient_out(found)
+
+    @app.patch("/v1/achats/ingredients/{item_id}", response_model=IngredientOut, tags=["achats"])
+    def ingredient_update(
+        item_id: ItemId, data: IngredientUpdateIn, user: ManagerDep, session: SessionDep
+    ) -> IngredientOut:
+        found = session.get(Ingredient, item_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="Ingrédient introuvable")
+        changes = data.model_dump(exclude_unset=True)
+        for key in ("name", "active"):
+            if key in changes and changes[key] is None:
+                raise HTTPException(status_code=422, detail="Valeur obligatoire")
+        achat_act(session, lambda: achats.update_ingredient(session, user, found, changes))
+        return ingredient_out(found)
+
+    @app.post(
+        "/v1/achats/ingredients/{item_id}/inventaire",
+        response_model=IngredientOut,
+        tags=["achats"],
+    )
+    def ingredient_inventory(
+        item_id: ItemId, data: InventoryIn, user: ManagerDep, session: SessionDep
+    ) -> IngredientOut:
+        """Comptage réel : le stock devient la quantité comptée, l'écart est tracé."""
+        found = achat_act(
+            session, lambda: achats.inventory(session, user, item_id, data.quantity, data.reason)
+        )
+        return ingredient_out(found)
+
+    @app.get(
+        "/v1/achats/ingredients/{item_id}/mouvements",
+        response_model=list[StockMoveOut],
+        tags=["achats"],
+    )
+    def ingredient_moves(item_id: ItemId, _user: ManagerDep, session: SessionDep):
+        if session.get(Ingredient, item_id) is None:
+            raise HTTPException(status_code=404, detail="Ingrédient introuvable")
+        return [StockMoveOut.model_validate(m) for m in achats.moves(session, item_id)]
+
+    @app.get("/v1/achats", response_model=PurchaseListOut, tags=["achats"])
+    def purchase_list(
+        _user: ManagerDep,
+        session: SessionDep,
+        start: Annotated[date | None, Query()] = None,
+        end: Annotated[date | None, Query()] = None,
+        supplier: Annotated[int | None, Query(ge=1, le=999_999_999)] = None,
+    ) -> PurchaseListOut:
+        start, end = period(start, end)
+        return PurchaseListOut.model_validate(achats.purchases(session, start, end, supplier))
+
+    def purchase_out(session: Session, purchase_id: int) -> PurchaseOut:
+        return PurchaseOut.model_validate(achats.one(session, purchase_id))
+
+    @app.post("/v1/achats", response_model=PurchaseOut, status_code=201, tags=["achats"])
+    def purchase_add(data: PurchaseIn, user: ManagerDep, session: SessionDep) -> PurchaseOut:
+        """Enregistre un achat ; les lignes d'ingrédient entrent en stock."""
+        created = achat_act(session, lambda: achats.create_purchase(session, user, data))
+        return purchase_out(session, created.id)
+
+    @app.post("/v1/achats/{item_id}/annuler", response_model=PurchaseOut, tags=["achats"])
+    def purchase_cancel(
+        item_id: ItemId, data: ReasonIn, user: ManagerDep, session: SessionDep
+    ) -> PurchaseOut:
+        """Annule un achat (motif obligatoire) : il reste visible, le stock est repris."""
+        found = achats.locked_purchase(session, item_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="Achat introuvable")
+        achat_act(session, lambda: achats.cancel_purchase(session, user, found, data.reason))
+        return purchase_out(session, item_id)
 
     return app
 

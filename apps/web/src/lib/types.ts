@@ -88,6 +88,75 @@ export interface Pilotage {
   history_first: string | null;
   history_last: string | null;
   loyalty: { stamps: number; rewards: number; discount_mru: number; active_cards: number };
+  purchases: Spending; // J16
+  gross_margin_mru: number; // J16 : ventes − achats de la période
+  purchases_first: string | null; // J16 : premier achat saisi
+}
+
+// --- Achats et stock (J16) -----------------------------------------------------------------
+
+export type StockUnit = "kg" | "l" | "piece";
+export type PurchaseCategory = "ingredients" | "emballages" | "energie" | "entretien" | "materiel" | "autre";
+
+export interface Supplier {
+  id: number;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  active: boolean;
+}
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  unit: StockUnit;
+  stock_qty: number;
+  alert_qty: number | null;
+  active: boolean;
+  low: boolean;
+}
+
+export interface Purchase {
+  id: number;
+  purchase_day: string;
+  supplier_id: number | null;
+  supplier: string | null;
+  payment_method: PaymentMethod;
+  total_mru: number;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  lines: { ingredient_id: number | null; label: string; category: PurchaseCategory; quantity: number; amount_mru: number }[];
+}
+
+export interface PurchaseList {
+  start: string;
+  end: string;
+  purchases: Purchase[];
+  total_mru: number;
+  truncated: boolean;
+}
+
+/** Corps de POST /v1/achats : lignes et montants du ticket, jamais de total. */
+export interface PurchaseRequest {
+  purchase_day: string;
+  supplier_id: number | null;
+  payment_method: PaymentMethod;
+  note?: string;
+  lines: (
+    | { ingredient_id: number; quantity: number; amount_mru: number }
+    | { label: string; category: PurchaseCategory; quantity: number; amount_mru: number }
+  )[];
+}
+
+export interface Spending {
+  total_mru: number;
+  by_day: { day: string; amount_mru: number }[];
+  by_category: { category: PurchaseCategory; label: string; amount_mru: number }[];
+  by_supplier: { supplier: string; count: number; amount_mru: number }[];
+  low_stock: { id: number; name: string; unit: StockUnit; stock_qty: number }[];
 }
 
 /** Historique des actions du staff (v1.1) : GET /v1/historique. */

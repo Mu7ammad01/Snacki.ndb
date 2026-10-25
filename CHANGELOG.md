@@ -1,5 +1,15 @@
 # Historique des versions
 
+## J16 · achats et stock · octobre 2026
+
+Demande du 25/10/2026 : gestion des achats par la gérante et les admins (ADR 0018).
+
+- **Achats** : saisie d'un ticket (date, fournisseur, paiement, lignes et montants) ; total calculé par l'API ; annulation avec motif, jamais d'effacement.
+- **Stock** : ingrédients en kg, litres ou pièces ; le stock monte à chaque achat ; inventaire avec motif ; alerte sous un seuil ; grand livre de chaque variation.
+- **Fournisseurs** : nom, téléphone, produits habituels ; désactivation sans perdre l'historique.
+- **Pilotage** : dépenses par catégorie et fournisseur, marge brute (ventes − achats), stock bas ; onglet « Achats » dans le rapport Excel.
+- Sécurité : réservé à la gérante et à l'admin ; chaque action au journal ; stock jamais négatif.
+
 ## v1.1 · octobre 2026
 
 Demandes de la gérante (réunion 5, lot B).

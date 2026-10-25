@@ -79,6 +79,7 @@ export default async function PilotagePage({
   const dayMax = Math.max(0, ...(data?.by_day ?? []).map((d) => d.app_mru + d.comptoir_mru + d.historique_mru));
   const topMax = Math.max(0, ...(data?.top ?? []).map((t) => t.quantity));
   const payMax = Math.max(0, ...(data?.payments ?? []).map((p) => p.amount_mru));
+  const spendMax = Math.max(0, ...(data?.purchases.by_category ?? []).map((c) => c.amount_mru));
 
   return (
     <main className="app staff wide">
@@ -89,6 +90,7 @@ export default async function PilotagePage({
         </div>
         <nav className="head-actions" aria-label="Actions">
           <a className="primary" href={`/pilotage/rapport?start=${period.start}&end=${period.end}`}>Générer un rapport</a>
+          <a className="ghost" href={`/achats?start=${period.start}&end=${period.end}`}>Achats</a>
           <a className="ghost" href={`/historique?start=${period.start}&end=${period.end}`}>Historique</a>
           <a className="ghost" href="/staff">Espace staff</a>
         </nav>
@@ -116,6 +118,8 @@ export default async function PilotagePage({
             <div><span>Panier moyen</span><b>{mru(data.average_basket_mru)}</b></div>
             <div><span>Aujourd&apos;hui</span><b>{mru(data.today_mru)}</b></div>
             <div><span>Cumul depuis l&apos;ouverture</span><b>{mru(data.all_time_mru)}</b></div>
+            <div><span>Achats</span><b>{mru(data.purchases.total_mru)}</b></div>
+            <div><span>Marge brute</span><b>{mru(data.gross_margin_mru)}</b></div>
           </section>
 
           <section className="charts">
@@ -223,6 +227,35 @@ export default async function PilotagePage({
               ))}
             </ul>
             <p className="muted">L&apos;historique Excel ne précise pas le moyen de paiement.</p>
+          </section>
+
+          <section className="track">
+            <h2>Achats et marge</h2>
+            <p>
+              Ventes {mru(data.revenue_mru)} − achats {mru(data.purchases.total_mru)} = <b>marge brute {mru(data.gross_margin_mru)}</b>
+            </p>
+            {data.purchases.by_category.length === 0 && <p className="muted">Aucun achat saisi sur cette période.</p>}
+            <ul className="bars">
+              {data.purchases.by_category.map((c) => (
+                <li key={c.category}>
+                  <span className="bl">{c.label}</span>
+                  <Bar max={spendMax} parts={[{ value: c.amount_mru, cls: "b-hist" }]} />
+                  <span className="bv">{mru(c.amount_mru)}</span>
+                </li>
+              ))}
+            </ul>
+            {data.purchases.by_supplier.length > 0 && (
+              <p className="muted">Par fournisseur : {data.purchases.by_supplier.map((x) => `${x.supplier} ${mru(x.amount_mru)}`).join(" · ")}</p>
+            )}
+            {data.purchases.low_stock.length > 0 && (
+              <p className="alert">Stock bas : {data.purchases.low_stock.map((i) => i.name).join(", ")}</p>
+            )}
+            <p className="muted">
+              {data.purchases_first
+                ? `Marge fiable à partir du ${shortDay(data.purchases_first)}, date du premier achat saisi.`
+                : "La marge deviendra fiable dès que les achats seront saisis."}{" "}
+              <a href={`/achats?start=${period.start}&end=${period.end}`}>Voir les achats</a>
+            </p>
           </section>
 
           <section className="track">
